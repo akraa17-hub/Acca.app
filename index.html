@@ -5,17 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>برنامج محاسبي - أكرم فاضل</title>
     
-    <!-- تحميل مكتبة Tailwind CSS للتنسيق -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- تحميل React و ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- تحميل Babel لترجمة كود React داخل المتصفح -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- تحميل أيقونات Lucide -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
@@ -39,13 +35,11 @@
         /* تحسينات للطباعة */
         @page { margin: 2cm; }
     </style>
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
 
-  // Your web app's Firebase configuration
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
   const firebaseConfig = {
     apiKey: "AIzaSyDUcQyht2D6vpuUZyCQTxEqtLZf4Feo5aM",
     authDomain: "acca-app-80ca8.firebaseapp.com",
@@ -55,8 +49,12 @@
     appId: "1:196121768353:web:e0623f775bb3f0409e1be0"
   };
 
-  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // جعل أدوات فايربيس متاحة لتطبيق React
+  window.db = db;
+  window.fs = { collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot };
 </script>
   
 </head>
@@ -67,12 +65,10 @@
         const { useState, useMemo, useEffect } = React;
 
         // --- مكون للأيقونات ---
-        // نقوم بإنشاء مكون مخصص للأيقونات لأننا نستخدم نسخة المتصفح
         const LucideIcon = ({ name, size = 24, className = "" }) => {
             useEffect(() => {
                 lucide.createIcons();
             }, [name]);
-
             return <i data-lucide={name} width={size} height={size} className={className}></i>;
         };
 
@@ -97,33 +93,68 @@
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const [isLoaded, setIsLoaded] = useState(false); // للتأكد من تحميل البيانات السحابية
 
-            // --- 1. هيكل البيانات (Data Structure) ---
-
-            const [accounts, setAccounts] = useState([
-                // الأصول
-                { id: '1', code: '1', name: 'الأصول', type: 'asset', level: 1, parentId: null },
-                { id: '11', code: '11', name: 'الأصول المتداولة', type: 'asset', level: 2, parentId: '1' },
-                { id: '1101', code: '1101', name: 'النقدية في الصندوق', type: 'asset', level: 3, parentId: '11' },
-                { id: '1102', code: '1102', name: 'البنك - الأهلي', type: 'asset', level: 3, parentId: '11' },
-                { id: '1103', code: '1103', name: 'العملاء', type: 'asset', level: 3, parentId: '11' },
-                // الخصوم
-                { id: '2', code: '2', name: 'الخصوم', type: 'liability', level: 1, parentId: null },
-                { id: '21', code: '21', name: 'الخصوم المتداولة', type: 'liability', level: 2, parentId: '2' },
-                { id: '2101', code: '2101', name: 'الموردين', type: 'liability', level: 3, parentId: '21' },
-                // حقوق الملكية
-                { id: '3', code: '3', name: 'حقوق الملكية', type: 'equity', level: 1, parentId: null },
-                { id: '3101', code: '3101', name: 'رأس المال', type: 'equity', level: 3, parentId: '3' },
-                // الإيرادات
-                { id: '4', code: '4', name: 'الإيرادات', type: 'revenue', level: 1, parentId: null },
-                { id: '4101', code: '4101', name: 'إيرادات المبيعات', type: 'revenue', level: 3, parentId: '4' },
-                // المصروفات
-                { id: '5', code: '5', name: 'المصروفات', type: 'expense', level: 1, parentId: null },
-                { id: '5101', code: '5101', name: 'مصروفات الإيجار', type: 'expense', level: 3, parentId: '5' },
-                { id: '5102', code: '5102', name: 'مصروفات الكهرباء', type: 'expense', level: 3, parentId: '5' },
-            ]);
-
+            // --- 1. هيكل البيانات (Data Structure) من السحابة ---
+            const [accounts, setAccounts] = useState([]);
             const [journalEntries, setJournalEntries] = useState([]);
+
+            // الربط المباشر مع سحابة فايربيس
+            useEffect(() => {
+                const initFirebase = () => {
+                    if (!window.db || !window.fs) {
+                        setTimeout(initFirebase, 100);
+                        return;
+                    }
+
+                    // الاستماع اللحظي للحسابات
+                    const unsubAccounts = window.fs.onSnapshot(window.fs.collection(window.db, "accounts"), (snapshot) => {
+                        if (snapshot.empty) {
+                            // رفع الحسابات الافتراضية إذا كانت السحابة فارغة
+                            const initialAccounts = [
+                                { id: '1', code: '1', name: 'الأصول', type: 'asset', level: 1, parentId: null },
+                                { id: '11', code: '11', name: 'الأصول المتداولة', type: 'asset', level: 2, parentId: '1' },
+                                { id: '1101', code: '1101', name: 'النقدية في الصندوق', type: 'asset', level: 3, parentId: '11' },
+                                { id: '1102', code: '1102', name: 'البنك - الأهلي', type: 'asset', level: 3, parentId: '11' },
+                                { id: '1103', code: '1103', name: 'العملاء', type: 'asset', level: 3, parentId: '11' },
+                                { id: '2', code: '2', name: 'الخصوم', type: 'liability', level: 1, parentId: null },
+                                { id: '21', code: '21', name: 'الخصوم المتداولة', type: 'liability', level: 2, parentId: '2' },
+                                { id: '2101', code: '2101', name: 'الموردين', type: 'liability', level: 3, parentId: '21' },
+                                { id: '3', code: '3', name: 'حقوق الملكية', type: 'equity', level: 1, parentId: null },
+                                { id: '3101', code: '3101', name: 'رأس المال', type: 'equity', level: 3, parentId: '3' },
+                                { id: '4', code: '4', name: 'الإيرادات', type: 'revenue', level: 1, parentId: null },
+                                { id: '4101', code: '4101', name: 'إيرادات المبيعات', type: 'revenue', level: 3, parentId: '4' },
+                                { id: '5', code: '5', name: 'المصروفات', type: 'expense', level: 1, parentId: null },
+                                { id: '5101', code: '5101', name: 'مصروفات الإيجار', type: 'expense', level: 3, parentId: '5' },
+                                { id: '5102', code: '5102', name: 'مصروفات الكهرباء', type: 'expense', level: 3, parentId: '5' },
+                            ];
+                            initialAccounts.forEach(acc => {
+                                const accData = { ...acc };
+                                delete accData.id;
+                                window.fs.setDoc(window.fs.doc(window.db, "accounts", acc.id), accData);
+                            });
+                        } else {
+                            const accs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                            setAccounts(accs);
+                        }
+                    });
+
+                    // الاستماع اللحظي لقيود اليومية
+                    const unsubJournals = window.fs.onSnapshot(window.fs.collection(window.db, "journalEntries"), (snapshot) => {
+                        const entries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                        // ترتيب القيود من الأقدم للأحدث بناءً على معرف القيد (تاريخ الإنشاء)
+                        setJournalEntries(entries.sort((a,b) => a.id - b.id));
+                        setIsLoaded(true);
+                    });
+
+                    return () => {
+                        unsubAccounts();
+                        unsubJournals();
+                    };
+                };
+
+                initFirebase();
+            }, []);
 
             // --- 2. المنطق المساعد (Helper Logic) ---
 
@@ -201,7 +232,7 @@
                 const [isEditing, setIsEditing] = useState(false);
                 
                 useEffect(() => {
-                    if (!isEditing && !formData.code) {
+                    if (!isEditing && !formData.code && accounts.length > 0) {
                         const nextCode = generateNextCode(null);
                         setFormData(prev => ({ ...prev, code: nextCode }));
                     }
@@ -222,21 +253,34 @@
                     });
                 };
 
-                const handleSubmit = () => {
+                // حفظ الحساب في السحابة
+                const handleSubmit = async () => {
                 if (!formData.code || !formData.name) return;
                 let level = 1;
                 if (formData.parentId) {
                     const parent = accounts.find(a => a.id === formData.parentId);
                     if (parent) level = parent.level + 1;
                 }
-                if (isEditing) {
-                    setAccounts(accounts.map(acc => acc.id === formData.id ? { ...formData, level } : acc));
+                
+                const accountData = { 
+                    code: formData.code, 
+                    name: formData.name, 
+                    type: formData.type, 
+                    parentId: formData.parentId || null, 
+                    level 
+                };
+
+                try {
+                    // استخدام setDoc ليكون كود الحساب هو نفسه معرف المستند في السحابة
+                    await window.fs.setDoc(window.fs.doc(window.db, "accounts", formData.code), accountData);
+                    
                     setIsEditing(false);
-                } else {
-                    setAccounts([...accounts, { ...formData, id: formData.code, level }]);
+                    const nextRootCode = generateNextCode(null);
+                    setFormData({ id: '', code: nextRootCode, name: '', type: 'asset', parentId: '' });
+                } catch(e) {
+                    console.error("خطأ في الحفظ السحابي", e);
+                    alert("حدث خطأ أثناء حفظ الحساب");
                 }
-                const nextRootCode = generateNextCode(null);
-                setFormData({ id: '', code: nextRootCode, name: '', type: 'asset', parentId: '' });
                 };
 
                 const handleEditClick = (account) => {
@@ -258,7 +302,8 @@
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
 
-                const handleDeleteClick = (id) => {
+                // حذف الحساب من السحابة
+                const handleDeleteClick = async (id) => {
                 if (window.confirm('هل أنت متأكد من حذف هذا الحساب؟')) {
                     const isUsed = journalEntries.some(entry => entry.lines.some(line => line.accountId === id));
                     if (isUsed) {
@@ -270,7 +315,11 @@
                     alert('لا يمكن حذف حساب رئيسي يحتوي على حسابات فرعية.');
                     return;
                     }
-                    setAccounts(accounts.filter(a => a.id !== id));
+                    try {
+                        await window.fs.deleteDoc(window.fs.doc(window.db, "accounts", id));
+                    } catch(e) {
+                        console.error("خطأ في الحذف السحابي", e);
+                    }
                 }
                 };
 
@@ -466,22 +515,36 @@
                 setViewMode('create');
                 };
 
-                const saveEntry = () => {
+                // حفظ القيد في السحابة
+                const saveEntry = async () => {
                 if (!isBalanced || !newEntry.description) return;
                 
-                if (editingId) {
-                    setJournalEntries(journalEntries.map(e => e.id === editingId ? { ...newEntry } : e));
-                } else {
-                    setJournalEntries([...journalEntries, { ...newEntry, id: Date.now() }]);
-                }
+                const entryData = {
+                    date: newEntry.date,
+                    description: newEntry.description,
+                    lines: newEntry.lines
+                };
+                
+                try {
+                    if (editingId) {
+                        await window.fs.updateDoc(window.fs.doc(window.db, "journalEntries", editingId), entryData);
+                    } else {
+                        // استخدام تاريخ الوقت بالملي ثانية كمعرف مستند لترتيبها لاحقا
+                        const timeId = Date.now().toString();
+                        await window.fs.setDoc(window.fs.doc(window.db, "journalEntries", timeId), entryData);
+                    }
 
-                setViewMode('list');
-                setEditingId(null);
-                setNewEntry({
-                    date: new Date().toISOString().split('T')[0],
-                    description: '',
-                    lines: [{ accountId: '', debit: 0, credit: 0, note: '' }, { accountId: '', debit: 0, credit: 0, note: '' }]
-                });
+                    setViewMode('list');
+                    setEditingId(null);
+                    setNewEntry({
+                        date: new Date().toISOString().split('T')[0],
+                        description: '',
+                        lines: [{ accountId: '', debit: 0, credit: 0, note: '' }, { accountId: '', debit: 0, credit: 0, note: '' }]
+                    });
+                } catch(e) {
+                    console.error("خطأ في حفظ القيد", e);
+                    alert("حدث خطأ أثناء حفظ القيد");
+                }
                 };
 
                 const handleExportJournalExcel = () => {
@@ -653,7 +716,6 @@
                         <div key={entry.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="bg-slate-50 px-6 py-3 border-b flex justify-between items-center">
                             <div>
-                                <span className="font-bold text-slate-800 ml-3">قيد #{entry.id}</span>
                                 <span className="text-sm text-slate-500">{entry.date}</span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -681,8 +743,8 @@
                                 return (
                                     <tr key={idx}>
                                     <td className="px-6 py-2 text-slate-700">{accName} <span className="text-slate-400 text-xs mr-2">{line.note}</span></td>
-                                    <td className="px-6 py-2 font-mono text-slate-600">{line.debit > 0 ? line.debit.toLocaleString() : '-'}</td>
-                                    <td className="px-6 py-2 font-mono text-slate-600">{line.credit > 0 ? line.credit.toLocaleString() : '-'}</td>
+                                    <td className="px-6 py-2 font-mono text-slate-600">{line.debit > 0 ? Number(line.debit).toLocaleString() : '-'}</td>
+                                    <td className="px-6 py-2 font-mono text-slate-600">{line.credit > 0 ? Number(line.credit).toLocaleString() : '-'}</td>
                                     </tr>
                                 );
                                 })}
@@ -727,12 +789,12 @@
                 return entries;
                 };
 
-                // جلب جميع الحسابات التي لها حركة (أو جميع الحسابات الفرعية)
+                // جلب جميع الحسابات التي لها حركة
                 const activeAccounts = useMemo(() => {
                     return accounts
                         .filter(a => a.level === 3)
                         .map(acc => ({ ...acc, movements: getAccountEntries(acc.id) }))
-                        .filter(acc => acc.movements.length > 0); // يمكن إزالة هذا الشرط لعرض الحسابات الفارغة أيضاً
+                        .filter(acc => acc.movements.length > 0);
                 }, [accounts, journalEntries]);
 
                 return (
@@ -772,8 +834,8 @@
                                                 <td className="px-6 py-2 font-medium text-slate-800">
                                                     {row.desc} {row.note && <span className="text-xs text-slate-400 block">{row.note}</span>}
                                                 </td>
-                                                <td className="px-6 py-2 text-emerald-600">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
-                                                <td className="px-6 py-2 text-red-600">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
+                                                <td className="px-6 py-2 text-emerald-600">{row.debit > 0 ? Number(row.debit).toLocaleString() : '-'}</td>
+                                                <td className="px-6 py-2 text-red-600">{row.credit > 0 ? Number(row.credit).toLocaleString() : '-'}</td>
                                                 <td className="px-6 py-2 font-bold">{row.balance.toLocaleString()}</td>
                                             </tr>
                                         ))}
@@ -961,7 +1023,6 @@
                             <tr className="bg-slate-50 font-bold"><td colSpan="3" className="px-4 py-2">الإيرادات</td></tr>
                             {accounts.filter(a => a.type === 'revenue' && a.level === 3).map(acc => {
                                 const bal = getAccountBalance(acc.id);
-                                // عرض الحسابات حتى لو الرصيد صفر ليكون تفصيلياً، أو يمكن عمل شرط > 0
                                 if (bal === 0) return null;
                                 return (
                                 <tr key={acc.id}>
@@ -1120,13 +1181,26 @@
                 </button>
             );
 
+            // صفحة انتظار لحين تحميل البيانات من السحابة
+            if (!isLoaded) {
+                return (
+                    <div className="flex h-screen items-center justify-center bg-slate-50 font-sans" dir="rtl">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                            <h2 className="text-xl font-bold text-slate-700">جاري الاتصال بالسحابة...</h2>
+                            <p className="text-slate-500 text-sm mt-2">يرجى الانتظار لحظات</p>
+                        </div>
+                    </div>
+                );
+            }
+
             return (
                 <div className="flex h-screen bg-slate-50 font-sans" dir="rtl">
                 <aside className={`bg-slate-900 text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
                     <div className="p-6 border-b border-slate-800 flex items-center justify-between">
                     <div className={`${!isSidebarOpen && 'hidden'}`}>
                         <div className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 leading-tight">
-                        برنامج محاسبي تطبيق
+                        نظام محاسبي سحابي
                         </div>
                         <div className="text-xs text-slate-400 mt-1 font-medium">أكرم فاضل</div>
                     </div>
@@ -1153,7 +1227,10 @@
                         {activeTab === 'reports' && 'التقارير المالية'}
                     </h1>
                     <div className="flex items-center gap-2 text-slate-500 text-sm">
-                        <Calculator size={16} /> السنة المالية: 2023
+                        <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            متصل بالسحابة
+                        </span>
                     </div>
                     </header>
 
@@ -1174,4 +1251,3 @@
     </script>
 </body>
 </html>
-
