@@ -3,27 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>برنامج محاسبي - زياد العتيبي</title>
+    <title>نظام المحاسبة - زياد العتيبي</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
         body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; }
-        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="display: flex; height: 100vh; align-items: center; justify-content: center; font-family: sans-serif; direction: rtl;">
+            <div style="text-align: center;">
+                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                <h2 style="color: #334155;">جاري تشغيل النظام...</h2>
+            </div>
+        </div>
+    </div>
+
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDUcQyht2D6vpuUZyCQTxEqtLZf4Feo5aM",
@@ -34,167 +42,89 @@
             appId: "1:196121768353:web:e0623f775bb3f0409e1be0"
         };
 
-        // تفعيل الخدمات
         const app = initializeApp(firebaseConfig);
         window.db = getFirestore(app);
         window.auth = getAuth(app);
-        window.fs = { collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy };
+        window.fs = { collection, onSnapshot };
         window.authActions = { signInWithEmailAndPassword, signOut, onAuthStateChanged };
-
-        // إرسال إشارة بأن Firebase جاهز
+        
+        // إبلاغ الصفحة أن فايربيس جاهز
+        window.isFirebaseLoaded = true;
         window.dispatchEvent(new Event('firebase-ready'));
     </script>
 
     <script type="text/babel">
-        const { useState, useMemo, useEffect } = React;
+        const { useState, useEffect } = React;
 
-        // مكون الأيقونات
-        const LucideIcon = ({ name, size = 24, className = "" }) => {
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} width={size} height={size} className={className}></i>;
-        };
+        function App() {
+            const [status, setStatus] = useState('loading'); // loading, login, dashboard
+            const [user, setUser] = useState(null);
 
-        const Home = (props) => <LucideIcon name="home" {...props} />;
-        const Book = (props) => <LucideIcon name="book" {...props} />;
-        const PieChart = (props) => <LucideIcon name="pie-chart" {...props} />;
-        const Plus = (props) => <LucideIcon name="plus" {...props} />;
-        const Trash2 = (props) => <LucideIcon name="trash-2" {...props} />;
-        const Save = (props) => <LucideIcon name="save" {...props} />;
-        const ArrowLeft = (props) => <LucideIcon name="arrow-left" {...props} />;
-        const Filter = (props) => <LucideIcon name="filter" {...props} />;
-        const Edit = (props) => <LucideIcon name="edit" {...props} />;
-        const Menu = (props) => <LucideIcon name="menu" {...props} />;
-        const LogOut = (props) => <LucideIcon name="log-out" {...props} />;
-        const FileSpreadsheet = (props) => <LucideIcon name="file-spreadsheet" {...props} />;
-        const Printer = (props) => <LucideIcon name="printer" {...props} />;
+            useEffect(() => {
+                const init = () => {
+                    if (!window.authActions) return;
+                    window.authActions.onAuthStateChanged(window.auth, (currentUser) => {
+                        if (currentUser) {
+                            setUser(currentUser);
+                            setStatus('dashboard');
+                        } else {
+                            setStatus('login');
+                        }
+                    });
+                };
 
-        // شاشة تسجيل الدخول
-        const LoginScreen = () => {
-            const [username, setUsername] = useState('');
-            const [password, setPassword] = useState('');
-            const [error, setError] = useState('');
-            const [loading, setLoading] = useState(false);
+                if (window.isFirebaseLoaded) init();
+                else window.addEventListener('firebase-ready', init);
+            }, []);
 
-            const handleLogin = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-                try {
-                    let email = username.includes('@') ? username : `${username}@acca.app`;
-                    await window.authActions.signInWithEmailAndPassword(window.auth, email, password);
-                } catch (err) {
-                    setError('خطأ في الدخول! تأكد من البيانات.');
-                    setLoading(false);
-                }
-            };
+            if (status === 'loading') return (
+                <div className="flex h-screen items-center justify-center bg-slate-50">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <h2 className="text-xl font-bold text-slate-700">جاري الاتصال بقاعدة البيانات...</h2>
+                    </div>
+                </div>
+            );
 
-            return (
-                <div className="flex h-screen items-center justify-center bg-slate-100">
-                    <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full border border-slate-200 text-center">
-                        <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Book className="text-white" size={32} />
-                        </div>
-                        <h1 className="text-2xl font-bold mb-6">تسجيل الدخول - نظام المحاسبة</h1>
-                        {error && <div className="bg-red-50 text-red-600 p-2 rounded mb-4 text-sm">{error}</div>}
-                        <form onSubmit={handleLogin} className="space-y-4 text-right">
-                            <input type="text" placeholder="اسم المستخدم" className="w-full border p-3 rounded-lg" onChange={e => setUsername(e.target.value)} required />
-                            <input type="password" placeholder="كلمة المرور" className="w-full border p-3 rounded-lg" onChange={e => setPassword(e.target.value)} required />
-                            <button className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700">
-                                {loading ? 'جاري التحميل...' : 'دخول'}
-                            </button>
+            if (status === 'login') return (
+                <div className="flex h-screen items-center justify-center bg-slate-100 p-4">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-slate-200 text-center">
+                        <h1 className="text-2xl font-bold mb-2">تسجيل الدخول</h1>
+                        <p className="text-slate-500 mb-6 text-sm">نظام المحاسب القانوني زياد العتيبي</p>
+                        <form className="space-y-4" onSubmit={(e) => {
+                            e.preventDefault();
+                            const email = e.target.email.value.includes('@') ? e.target.email.value : `${e.target.email.value}@acca.app`;
+                            window.authActions.signInWithEmailAndPassword(window.auth, email, e.target.password.value)
+                                .catch(() => alert('بيانات الدخول غير صحيحة!'));
+                        }}>
+                            <input name="email" type="text" placeholder="اسم المستخدم" className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" required />
+                            <input name="password" type="password" placeholder="كلمة المرور" className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" required />
+                            <button className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition-all">دخول للنظام</button>
                         </form>
                     </div>
                 </div>
             );
-        };
-
-        function App() {
-            const [fbReady, setFbReady] = useState(false);
-            const [user, setUser] = useState(null);
-            const [isLoaded, setIsLoaded] = useState(false);
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [accounts, setAccounts] = useState([]);
-            const [journalEntries, setJournalEntries] = useState([]);
-
-            // التأكد من جاهزية Firebase قبل كل شيء
-            useEffect(() => {
-                const handleReady = () => setFbReady(true);
-                if (window.db) handleReady();
-                else window.addEventListener('firebase-ready', handleReady);
-                return () => window.removeEventListener('firebase-ready', handleReady);
-            }, []);
-
-            useEffect(() => {
-                if (!fbReady) return;
-                const unsubAuth = window.authActions.onAuthStateChanged(window.auth, (u) => {
-                    setUser(u);
-                    if (!u) setIsLoaded(true);
-                });
-                return () => unsubAuth();
-            }, [fbReady]);
-
-            useEffect(() => {
-                if (!user || !fbReady) return;
-
-                const unsubAcc = window.fs.onSnapshot(window.fs.collection(window.db, "accounts"), (snap) => {
-                    const accs = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    setAccounts(accs);
-                });
-
-                const unsubJournals = window.fs.onSnapshot(window.fs.collection(window.db, "journalEntries"), (snap) => {
-                    const entries = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    setJournalEntries(entries);
-                    setIsLoaded(true);
-                });
-
-                return () => { unsubAcc(); unsubJournals(); };
-            }, [user, fbReady]);
-
-            if (!isLoaded) return (
-                <div className="flex h-screen items-center justify-center bg-slate-50">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <h2 className="text-xl font-bold text-slate-700">جاري تحميل النظام...</h2>
-                    </div>
-                </div>
-            );
-
-            if (!user) return <LoginScreen />;
 
             return (
                 <div className="flex h-screen bg-slate-50">
-                    <aside className="w-64 bg-slate-900 text-white p-6 no-print">
-                        <h2 className="text-xl font-bold mb-10 text-blue-400">نظام زياد العتيبي</h2>
-                        <nav className="space-y-4">
-                            <button onClick={() => setActiveTab('dashboard')} className="w-full flex items-center gap-2 hover:text-blue-400"><Home size={20}/> الرئيسية</button>
-                            <button onClick={() => setActiveTab('journal')} className="w-full flex items-center gap-2 hover:text-blue-400"><Plus size={20}/> قيود اليومية</button>
-                            <button onClick={() => window.authActions.signOut(window.auth)} className="w-full flex items-center gap-2 text-red-400 mt-20"><LogOut size={20}/> خروج</button>
-                        </nav>
+                    <aside className="w-64 bg-slate-900 text-white p-6 hidden md:block">
+                        <div className="text-xl font-bold mb-8 text-blue-400">نظام المحاسبة</div>
+                        <div className="space-y-4 text-slate-400">
+                            <div className="text-white bg-slate-800 p-2 rounded cursor-pointer">الرئيسية</div>
+                            <div className="p-2 hover:text-white cursor-pointer" onClick={() => window.authActions.signOut(window.auth)}>تسجيل الخروج</div>
+                        </div>
                     </aside>
                     <main className="flex-1 p-8 overflow-auto">
-                        <header className="flex justify-between items-center mb-8 border-b pb-4">
-                            <h1 className="text-2xl font-bold">لوحة التحكم</h1>
-                            <div className="text-sm bg-blue-50 px-4 py-2 rounded text-blue-700 font-bold">{user.email}</div>
+                        <header className="flex justify-between items-center mb-10 border-b pb-4">
+                            <h2 className="text-2xl font-bold">لوحة التحكم</h2>
+                            <div className="bg-emerald-100 text-emerald-700 px-4 py-1 rounded-full text-sm font-bold">
+                                متصل: {user.email.split('@')[0]}
+                            </div>
                         </header>
-                        
-                        {activeTab === 'dashboard' && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                                    <h3 className="text-slate-500">عدد القيود</h3>
-                                    <p className="text-3xl font-bold">{journalEntries.length}</p>
-                                </div>
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                                    <h3 className="text-slate-500">عدد الحسابات</h3>
-                                    <p className="text-3xl font-bold">{accounts.length}</p>
-                                </div>
-                            </div>
-                        )}
-                        
-                        {activeTab === 'journal' && (
-                            <div className="bg-white p-4 rounded shadow">
-                                <h3 className="font-bold mb-4">قائمة القيود الأخيرة</h3>
-                                <p className="text-slate-500 text-sm">هنا ستظهر قيودك التي سيدخلها المتدرب.</p>
-                            </div>
-                        )}
+                        <div className="bg-white p-10 rounded-2xl shadow-sm border border-slate-200 text-center">
+                            <h3 className="text-xl text-slate-600">أهلاً بك في نظامك المحاسبي</h3>
+                            <p className="mt-4 text-slate-400">بإمكانك الآن البدء في إدخال القيود ومتابعة التقارير المالية.</p>
+                        </div>
                     </main>
                 </div>
             );
