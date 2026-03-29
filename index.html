@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>النظام المحاسبي - زياد العتيبي</title>
+    <title>النظام المحاسبي المتكامل - زياد العتيبي</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; margin: 0; }
-        .sidebar-item:hover { background-color: #1e293b; color: white; }
-        .active-tab { background-color: #2563eb !important; color: white !important; }
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; }
+        .sidebar-active { background-color: #2563eb; color: white; shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
     </style>
 </head>
 <body>
@@ -23,8 +22,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDUcQyht2D6vpuUZyCQTxEqtLZf4Feo5aM",
@@ -38,51 +37,52 @@
         const app = initializeApp(firebaseConfig);
         window.db = getFirestore(app);
         window.auth = getAuth(app);
-        window.fs = { collection, onSnapshot, doc, setDoc, addDoc };
+        window.fs = { collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot };
         window.authActions = { signInWithEmailAndPassword, signOut, onAuthStateChanged };
-        
         window.dispatchEvent(new Event('firebase-ready'));
     </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // مكون الأيقونات
         const Icon = ({ name, className = "" }) => {
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [name]);
+            useEffect(() => { if(window.lucide) lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={`w-5 h-5 ${className}`}></i>;
         };
 
         function App() {
             const [user, setUser] = useState(null);
-            const [loading, setLoading] = useState(true);
+            const [isLoaded, setIsLoaded] = useState(false);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [accounts, setAccounts] = useState([]);
             const [journalEntries, setJournalEntries] = useState([]);
 
-            // تفعيل النظام بعد جاهزية Firebase
+            // الحساب الذي يتم تعديله أو إضافته حالياً
+            const [coaForm, setCoaForm] = useState({ id: '', code: '', name: '', type: 'asset', parentId: '' });
+            const [isEditingCoa, setIsEditingCoa] = useState(false);
+
             useEffect(() => {
-                const startApp = () => {
-                    window.authActions.onAuthStateChanged(window.auth, (currentUser) => {
-                        setUser(currentUser);
-                        setLoading(false);
+                const init = () => {
+                    window.authActions.onAuthStateChanged(window.auth, (u) => {
+                        setUser(u);
+                        if (!u) setIsLoaded(true);
                     });
                 };
-                if (window.authActions) startApp();
-                else window.addEventListener('firebase-ready', startApp);
+                if (window.authActions) init();
+                else window.addEventListener('firebase-ready', init);
             }, []);
 
-            // جلب البيانات من Firebase
             useEffect(() => {
                 if (!user) return;
-                const unsubAcc = window.fs.onSnapshot(window.fs.collection(window.db, "accounts"), (s) => 
-                    setAccounts(s.docs.map(d => ({...d.data(), id: d.id}))));
-                const unsubJournals = window.fs.onSnapshot(window.fs.collection(window.db, "journalEntries"), (s) => 
-                    setJournalEntries(s.docs.map(d => ({...d.data(), id: d.id}))));
+                const unsubAcc = window.fs.onSnapshot(window.fs.collection(window.db, "accounts"), (s) => setAccounts(s.docs.map(d => ({...d.data(), id: d.id}))));
+                const unsubJournals = window.fs.onSnapshot(window.fs.collection(window.db, "journalEntries"), (s) => {
+                    setJournalEntries(s.docs.map(d => ({...d.data(), id: d.id})));
+                    setIsLoaded(true);
+                });
                 return () => { unsubAcc(); unsubJournals(); };
             }, [user]);
 
-            // حساب الأرصدة (دالتك الأصلية)
+            // --- دوال الدليل المنطقية ---
             const getBalance = (id) => {
                 let bal = 0;
                 const acc = accounts.find(a => a.id === id);
@@ -96,26 +96,41 @@
                 return bal;
             };
 
-            if (loading) return (
-                <div className="h-screen flex items-center justify-center bg-slate-50">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <h2 className="text-xl font-bold text-slate-700">جاري تشغيل نظام المحاسبة...</h2>
-                    </div>
-                </div>
-            );
+            const generateNextCode = (parent) => {
+                const siblings = parent ? accounts.filter(a => a.parentId === parent.id) : accounts.filter(a => !a.parentId);
+                if (siblings.length === 0) return parent ? (parent.code.length === 1 ? `${parent.code}1` : `${parent.code}01`) : '1';
+                const maxCode = Math.max(...siblings.map(a => parseInt(a.code)));
+                return (maxCode + 1).toString();
+            };
 
+            const handleSaveAccount = async () => {
+                if (!coaForm.name) return alert("يرجى إدخال اسم الحساب");
+                const level = coaForm.parentId ? (accounts.find(a => a.id === coaForm.parentId).level + 1) : 1;
+                const data = { code: coaForm.code, name: coaForm.name, type: coaForm.type, parentId: coaForm.parentId || null, level };
+                try {
+                    await window.fs.setDoc(window.fs.doc(window.db, "accounts", coaForm.code), data);
+                    setCoaForm({ id: '', code: generateNextCode(null), name: '', type: 'asset', parentId: '' });
+                    setIsEditingCoa(false);
+                } catch(e) { alert("خطأ في الحفظ"); }
+            };
+
+            const deleteAccount = async (id) => {
+                if (journalEntries.some(e => e.lines?.some(l => l.accountId === id))) return alert("لا يمكن حذف حساب عليه حركات!");
+                if (accounts.some(a => a.parentId === id)) return alert("لا يمكن حذف حساب رئيسي!");
+                if (confirm("هل أنت متأكد؟")) await window.fs.deleteDoc(window.fs.doc(window.db, "accounts", id));
+            };
+
+            if (!isLoaded) return <div className="h-screen flex items-center justify-center">جاري التحميل...</div>;
             if (!user) return (
-                <div className="h-screen flex items-center justify-center bg-slate-100 p-4">
-                    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-                        <h1 className="text-2xl font-bold mb-6">تسجيل الدخول للنظام</h1>
+                <div className="h-screen flex items-center justify-center bg-slate-100 p-4 text-center">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
+                        <h1 className="text-2xl font-bold mb-6">نظام زياد العتيبي المحاسبي</h1>
                         <form className="space-y-4" onSubmit={(e) => {
                             e.preventDefault();
                             const email = e.target.email.value.includes('@') ? e.target.email.value : `${e.target.email.value}@acca.app`;
-                            window.authActions.signInWithEmailAndPassword(window.auth, email, e.target.password.value)
-                                .catch(() => alert('بيانات الدخول غير صحيحة!'));
+                            window.authActions.signInWithEmailAndPassword(window.auth, email, e.target.password.value).catch(() => alert('بيانات خاطئة'));
                         }}>
-                            <input name="email" type="text" placeholder="اسم المستخدم" className="w-full border p-3 rounded-lg text-right" required />
+                            <input name="email" placeholder="اسم المستخدم" className="w-full border p-3 rounded-lg text-right" required />
                             <input name="password" type="password" placeholder="كلمة المرور" className="w-full border p-3 rounded-lg text-right" required />
                             <button className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold">دخول</button>
                         </form>
@@ -125,79 +140,68 @@
 
             return (
                 <div className="flex h-screen bg-slate-50" dir="rtl">
-                    {/* القائمة الجانبية الكاملة */}
                     <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col no-print">
-                        <div className="p-6 text-white text-xl font-bold border-b border-slate-800">نظام زياد العتيبي</div>
-                        <nav className="flex-1 p-4 space-y-2">
-                            <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${activeTab === 'dashboard' ? 'active-tab' : 'sidebar-item'}`}><Icon name="home"/> الرئيسية</button>
-                            <button onClick={() => setActiveTab('coa')} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${activeTab === 'coa' ? 'active-tab' : 'sidebar-item'}`}><Icon name="list"/> دليل الحسابات</button>
-                            <button onClick={() => setActiveTab('journal')} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${activeTab === 'journal' ? 'active-tab' : 'sidebar-item'}`}><Icon name="plus-circle"/> قيود اليومية</button>
-                            <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${activeTab === 'reports' ? 'active-tab' : 'sidebar-item'}`}><Icon name="pie-chart"/> القوائم المالية</button>
-                            <button onClick={() => window.authActions.signOut(window.auth)} className="w-full flex items-center gap-3 p-3 rounded-lg text-red-400 hover:bg-red-900/20 mt-10"><Icon name="log-out"/> تسجيل الخروج</button>
+                        <div className="p-6 text-white text-xl font-bold border-b border-slate-800">المحاسب الذكي</div>
+                        <nav className="p-4 space-y-2">
+                            <button onClick={()=>setActiveTab('dashboard')} className={`w-full flex items-center gap-3 p-3 rounded-lg ${activeTab==='dashboard'?'sidebar-active':''}`}><Icon name="home"/> الرئيسية</button>
+                            <button onClick={()=>setActiveTab('coa')} className={`w-full flex items-center gap-3 p-3 rounded-lg ${activeTab==='coa'?'sidebar-active':''}`}><Icon name="list"/> دليل الحسابات</button>
+                            <button onClick={()=>setActiveTab('journal')} className={`w-full flex items-center gap-3 p-3 rounded-lg ${activeTab==='journal'?'sidebar-active':''}`}><Icon name="plus-circle"/> قيود اليومية</button>
+                            <button onClick={()=>window.authActions.signOut(window.auth)} className="w-full flex items-center gap-3 p-3 text-red-400 mt-10 hover:bg-red-900/20"><Icon name="log-out"/> خروج</button>
                         </nav>
                     </aside>
 
-                    {/* المحتوى الرئيسي */}
-                    <main className="flex-1 overflow-auto p-8">
-                        <header className="flex justify-between items-center mb-8 border-b pb-4">
-                            <h2 className="text-2xl font-bold text-slate-800">
-                                {activeTab === 'dashboard' && 'نظرة عامة'}
-                                {activeTab === 'coa' && 'دليل الحسابات'}
-                                {activeTab === 'journal' && 'إدخال قيود اليومية'}
-                                {activeTab === 'reports' && 'التقارير المالية'}
-                            </h2>
-                            <div className="bg-blue-50 text-blue-700 px-4 py-1 rounded-full font-bold">متصل: {user.email.split('@')[0]}</div>
-                        </header>
-
+                    <main className="flex-1 p-8 overflow-auto">
                         {activeTab === 'dashboard' && (
                             <div className="grid grid-cols-3 gap-6">
-                                <div className="bg-white p-6 rounded-xl border shadow-sm text-center">
-                                    <h3 className="text-slate-500 mb-2">إجمالي الأصول</h3>
-                                    <p className="text-3xl font-bold">{accounts.filter(a=>a.type==='asset').reduce((s,a)=>s+getBalance(a.id),0).toLocaleString()}</p>
-                                </div>
-                                <div className="bg-white p-6 rounded-xl border shadow-sm text-center">
-                                    <h3 className="text-slate-500 mb-2">إجمالي الخصوم</h3>
-                                    <p className="text-3xl font-bold">{accounts.filter(a=>a.type==='liability').reduce((s,a)=>s+getBalance(a.id),0).toLocaleString()}</p>
-                                </div>
-                                <div className="bg-white p-6 rounded-xl border shadow-sm text-center">
-                                    <h3 className="text-slate-500 mb-2">صافي الربح</h3>
-                                    <p className="text-3xl font-bold text-emerald-600">{(accounts.filter(a=>a.type==='revenue').reduce((s,a)=>s+getBalance(a.id),0) - accounts.filter(a=>a.type==='expense').reduce((s,a)=>s+getBalance(a.id),0)).toLocaleString()}</p>
-                                </div>
+                                <div className="bg-white p-6 rounded-xl border shadow-sm"><h3>إجمالي الأصول</h3><p className="text-3xl font-bold">{accounts.filter(a=>a.type==='asset').reduce((s,a)=>s+getBalance(a.id),0).toLocaleString()}</p></div>
+                                <div className="bg-white p-6 rounded-xl border shadow-sm"><h3>إجمالي الخصوم</h3><p className="text-3xl font-bold">{accounts.filter(a=>a.type==='liability').reduce((s,a)=>s+getBalance(a.id),0).toLocaleString()}</p></div>
+                                <div className="bg-white p-6 rounded-xl border shadow-sm"><h3>صافي الربح</h3><p className="text-3xl font-bold text-emerald-600">{(accounts.filter(a=>a.type==='revenue').reduce((s,a)=>s+getBalance(a.id),0) - accounts.filter(a=>a.type==='expense').reduce((s,a)=>s+getBalance(a.id),0)).toLocaleString()}</p></div>
                             </div>
                         )}
 
                         {activeTab === 'coa' && (
-                            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                                <table className="w-full text-right">
-                                    <thead className="bg-slate-50 border-b">
-                                        <tr><th className="p-4">الكود</th><th className="p-4">اسم الحساب</th><th className="p-4">النوع</th><th className="p-4">الرصيد الحالي</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {accounts.sort((a,b)=>a.code-b.code).map(acc=>(
-                                            <tr key={acc.id} className="border-b hover:bg-slate-50">
-                                                <td className="p-4">{acc.code}</td><td className="p-4 font-bold">{acc.name}</td>
-                                                <td className="p-4">{acc.type}</td><td className="p-4 font-bold text-blue-600">{getBalance(acc.id).toLocaleString()}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="space-y-6">
+                                <div className="bg-white p-6 rounded-xl border shadow-sm">
+                                    <h4 className="font-bold mb-4">{isEditingCoa ? 'تعديل حساب' : 'إضافة حساب جديد'}</h4>
+                                    <div className="flex gap-4">
+                                        <input placeholder="اسم الحساب" className="border p-2 rounded flex-1" value={coaForm.name} onChange={e=>setCoaForm({...coaForm, name:e.target.value})} />
+                                        <select className="border p-2 rounded" value={coaForm.parentId} onChange={e=>{
+                                            const p = accounts.find(a=>a.id===e.target.value);
+                                            setCoaForm({...coaForm, parentId: e.target.value, code: generateNextCode(p), type: p?p.type:'asset'});
+                                        }}>
+                                            <option value="">-- حساب رئيسي --</option>
+                                            {accounts.filter(a=>a.level < 3).map(a=><option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                                        </select>
+                                        <button onClick={handleSaveAccount} className="bg-blue-600 text-white px-6 rounded font-bold">حفظ</button>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                                    <table className="w-full text-right">
+                                        <thead className="bg-slate-50 border-b">
+                                            <tr><th className="p-4">الكود</th><th className="p-4">الحساب</th><th className="p-4">النوع</th><th className="p-4 text-center">الرصيد</th><th className="p-4 text-center">إجراءات</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            {accounts.sort((a,b)=>a.code.localeCompare(b.code, undefined, {numeric: true})).map(acc=>(
+                                                <tr key={acc.id} className="border-b hover:bg-slate-50">
+                                                    <td className="p-4 font-mono text-slate-500">{acc.code}</td>
+                                                    <td className="p-4 font-bold" style={{paddingRight: `${(acc.level-1)*20 + 16}px`}}>{acc.level>1?'↳ ':''}{acc.name}</td>
+                                                    <td className="p-4 text-sm text-slate-500">{acc.type}</td>
+                                                    <td className="p-4 text-center font-bold text-blue-700">{getBalance(acc.id).toLocaleString()}</td>
+                                                    <td className="p-4 text-center">
+                                                        <button onClick={()=>deleteAccount(acc.id)} className="text-red-400 hover:text-red-600"><Icon name="trash-2"/></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
-
+                        
                         {activeTab === 'journal' && (
-                            <div className="bg-white p-10 rounded-xl border text-center shadow-sm">
-                                <Icon name="plus-circle" className="mx-auto text-blue-500 mb-4 w-12 h-12"/>
-                                <h3 className="text-xl font-bold mb-2">إضافة قيد محاسبي</h3>
-                                <p className="text-slate-500 mb-6">بإمكان المتدرب الآن إدخال البيانات مباشرة من هذا القسم.</p>
-                                <button className="bg-blue-600 text-white px-8 py-2 rounded-lg font-bold">بدء الإدخال</button>
-                            </div>
-                        )}
-
-                        {activeTab === 'reports' && (
-                            <div className="bg-white p-10 rounded-xl border text-center shadow-sm">
-                                <Icon name="file-text" className="mx-auto text-emerald-500 mb-4 w-12 h-12"/>
-                                <h3 className="text-xl font-bold">التقارير المالية</h3>
-                                <p className="mt-4 text-slate-500">جاري استخراج البيانات من دفتر الأستاذ العام...</p>
+                            <div className="bg-white p-10 rounded-xl border text-center">
+                                <Icon name="plus-circle" className="mx-auto w-12 h-12 text-blue-500 mb-4"/>
+                                <p>هذا القسم جاهز لاستقبال قيود اليومية من المتدرب.</p>
                             </div>
                         )}
                     </main>
