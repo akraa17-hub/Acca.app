@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>برنامج محاسبي - أكرم فاضل</title>
+    <title>برنامج محاسبي - المحاسب القانوني المستقبلي زياد العتيبي</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -32,13 +32,13 @@
             .break-inside-avoid { break-inside: avoid; }
         }
         
-        /* تحسينات للطباعة */
         @page { margin: 2cm; }
     </style>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDUcQyht2D6vpuUZyCQTxEqtLZf4Feo5aM",
@@ -51,10 +51,13 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const auth = getAuth(app);
 
   // جعل أدوات فايربيس متاحة لتطبيق React
   window.db = db;
+  window.auth = auth;
   window.fs = { collection, addDoc, setDoc, updateDoc, deleteDoc, doc, onSnapshot };
+  window.authActions = { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 </script>
   
 </head>
@@ -72,7 +75,6 @@
             return <i data-lucide={name} width={size} height={size} className={className}></i>;
         };
 
-        // تعريف الأيقونات المستخدمة
         const Home = (props) => <LucideIcon name="home" {...props} />;
         const Book = (props) => <LucideIcon name="book" {...props} />;
         const PieChart = (props) => <LucideIcon name="pie-chart" {...props} />;
@@ -87,30 +89,121 @@
         const Printer = (props) => <LucideIcon name="printer" {...props} />;
         const Download = (props) => <LucideIcon name="download" {...props} />;
         const FileSpreadsheet = (props) => <LucideIcon name="file-spreadsheet" {...props} />;
-        const Search = (props) => <LucideIcon name="search" {...props} />;
+        const LogOut = (props) => <LucideIcon name="log-out" {...props} />;
 
-        // --- بداية التطبيق ---
+        // --- مكون شاشة تسجيل الدخول ---
+        const LoginScreen = () => {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
+                try {
+                    let email = username.trim();
+                    if (!email.includes('@')) {
+                        email = email + '@acca.app';
+                    }
+                    await window.authActions.signInWithEmailAndPassword(window.auth, email, password);
+                } catch (err) {
+                    setError('اسم المستخدم أو كلمة المرور غير صحيحة!');
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="flex h-screen items-center justify-center bg-slate-100 font-sans" dir="rtl">
+                    <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full border border-slate-200 animate-fade-in">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-md">
+                                <Book className="text-white" size={32} />
+                            </div>
+                            <h1 className="text-2xl font-bold text-slate-800">تسجيل الدخول</h1>
+                            <p className="text-slate-500 text-sm mt-2">نظام المحاسبة السحابي - المحاسب القانوني المستقبلي زياد العتيبي</p>
+                        </div>
+                        
+                        {error && (
+                            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-200 text-center">
+                                {error}
+                            </div>
+                        )}
+                        
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">اسم المستخدم</label>
+                                <input 
+                                    type="text" 
+                                    value={username} 
+                                    onChange={e => setUsername(e.target.value)} 
+                                    className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50 transition-all" 
+                                    placeholder="مثال: admin أو student" 
+                                    required 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">كلمة المرور</label>
+                                <input 
+                                    type="password" 
+                                    value={password} 
+                                    onChange={e => setPassword(e.target.value)} 
+                                    className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50 transition-all" 
+                                    placeholder="••••••••" 
+                                    required 
+                                />
+                            </div>
+                            <button 
+                                disabled={loading} 
+                                type="submit" 
+                                className={`w-full text-white font-bold py-3 rounded-lg transition-colors mt-4 flex justify-center items-center gap-2 ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-md'}`}
+                            >
+                                {loading ? 'جاري الدخول...' : 'دخول للنظام'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- بداية التطبيق الرئيسي ---
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-            const [isLoaded, setIsLoaded] = useState(false); // للتأكد من تحميل البيانات السحابية
+            const [isLoaded, setIsLoaded] = useState(false);
+            
+            const [user, setUser] = useState(null);
+            const [authChecking, setAuthChecking] = useState(true);
 
-            // --- 1. هيكل البيانات (Data Structure) من السحابة ---
             const [accounts, setAccounts] = useState([]);
             const [journalEntries, setJournalEntries] = useState([]);
 
-            // الربط المباشر مع سحابة فايربيس
             useEffect(() => {
+                const checkAuth = () => {
+                    if (!window.auth || !window.authActions) {
+                        setTimeout(checkAuth, 100);
+                        return;
+                    }
+                    window.authActions.onAuthStateChanged(window.auth, (currentUser) => {
+                        setUser(currentUser);
+                        setAuthChecking(false);
+                    });
+                };
+                checkAuth();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+
                 const initFirebase = () => {
                     if (!window.db || !window.fs) {
                         setTimeout(initFirebase, 100);
                         return;
                     }
 
-                    // الاستماع اللحظي للحسابات
                     const unsubAccounts = window.fs.onSnapshot(window.fs.collection(window.db, "accounts"), (snapshot) => {
                         if (snapshot.empty) {
-                            // رفع الحسابات الافتراضية إذا كانت السحابة فارغة
                             const initialAccounts = [
                                 { id: '1', code: '1', name: 'الأصول', type: 'asset', level: 1, parentId: null },
                                 { id: '11', code: '11', name: 'الأصول المتداولة', type: 'asset', level: 2, parentId: '1' },
@@ -139,10 +232,8 @@
                         }
                     });
 
-                    // الاستماع اللحظي لقيود اليومية
                     const unsubJournals = window.fs.onSnapshot(window.fs.collection(window.db, "journalEntries"), (snapshot) => {
                         const entries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                        // ترتيب القيود من الأقدم للأحدث بناءً على معرف القيد (تاريخ الإنشاء)
                         setJournalEntries(entries.sort((a,b) => a.id - b.id));
                         setIsLoaded(true);
                     });
@@ -154,52 +245,31 @@
                 };
 
                 initFirebase();
-            }, []);
+            }, [user]);
 
-            // --- 2. المنطق المساعد (Helper Logic) ---
+            const handleLogout = () => {
+                if(window.confirm('هل تريد تسجيل الخروج من النظام؟')) {
+                    window.authActions.signOut(window.auth);
+                }
+            };
 
             const getAccountBalance = (accountId) => {
+                let balance = 0;
                 const account = accounts.find(a => a.id === accountId);
                 if (!account) return 0;
 
-                // الحصول على كافة المعرفات (معرف الحساب الحالي + كل أبنائه مهما كان مستواهم)
-                const getAllChildIds = (id) => {
-                    let ids = [id];
-                    accounts.filter(a => a.parentId === id).forEach(child => {
-                        ids = [...ids, ...getAllChildIds(child.id)];
-                    });
-                    return ids;
-                };
-
-                const targetIds = getAllChildIds(accountId);
-                let balance = 0;
-
-                journalEntries.forEach(entry => {
-                    entry.lines.forEach(line => {
-                        if (targetIds.includes(line.accountId)) {
-                            if (['asset', 'expense'].includes(account.type)) {
-                                balance += (Number(line.debit) - Number(line.credit));
-                            } else {
-                                balance += (Number(line.credit) - Number(line.debit));
-                            }
-                        }
-                    });
-                });
-                return balance;
-            };
-
-            const getAccountTotals = (accountId) => {
-                let totalDebit = 0;
-                let totalCredit = 0;
                 journalEntries.forEach(entry => {
                 entry.lines.forEach(line => {
                     if (line.accountId === accountId) {
-                    totalDebit += Number(line.debit);
-                    totalCredit += Number(line.credit);
+                    if (['asset', 'expense'].includes(account.type)) {
+                        balance += (Number(line.debit) - Number(line.credit));
+                    } else {
+                        balance += (Number(line.credit) - Number(line.debit));
+                    }
                     }
                 });
                 });
-                return { totalDebit, totalCredit };
+                return balance;
             };
 
             const generateNextCode = (parentAccount) => {
@@ -232,11 +302,7 @@
                 document.body.removeChild(link);
             };
 
-            const handlePrint = () => {
-                window.print();
-            };
-
-            // --- 3. المكونات الفرعية (Sub-Components) ---
+            const handlePrint = () => window.print();
 
             const ChartOfAccountsView = () => {
                 const [formData, setFormData] = useState({ id: '', code: '', name: '', type: 'asset', parentId: '' });
@@ -255,16 +321,9 @@
                     const pid = e.target.value;
                     const parentAcc = accounts.find(a => a.id === pid);
                     const nextCode = generateNextCode(parentAcc || null);
-                    
-                    setFormData({
-                        ...formData,
-                        parentId: pid,
-                        code: nextCode,
-                        type: parentAcc ? parentAcc.type : 'asset'
-                    });
+                    setFormData({ ...formData, parentId: pid, code: nextCode, type: parentAcc ? parentAcc.type : 'asset' });
                 };
 
-                // حفظ الحساب في السحابة
                 const handleSubmit = async () => {
                 if (!formData.code || !formData.name) return;
                 let level = 1;
@@ -273,25 +332,14 @@
                     if (parent) level = parent.level + 1;
                 }
                 
-                const accountData = { 
-                    code: formData.code, 
-                    name: formData.name, 
-                    type: formData.type, 
-                    parentId: formData.parentId || null, 
-                    level 
-                };
+                const accountData = { code: formData.code, name: formData.name, type: formData.type, parentId: formData.parentId || null, level };
 
                 try {
-                    // استخدام setDoc ليكون كود الحساب هو نفسه معرف المستند في السحابة
                     await window.fs.setDoc(window.fs.doc(window.db, "accounts", formData.code), accountData);
-                    
                     setIsEditing(false);
                     const nextRootCode = generateNextCode(null);
                     setFormData({ id: '', code: nextRootCode, name: '', type: 'asset', parentId: '' });
-                } catch(e) {
-                    console.error("خطأ في الحفظ السحابي", e);
-                    alert("حدث خطأ أثناء حفظ الحساب");
-                }
+                } catch(e) { alert("حدث خطأ أثناء حفظ الحساب"); }
                 };
 
                 const handleEditClick = (account) => {
@@ -302,35 +350,18 @@
 
                 const handleAddSubAccount = (parentAccount) => {
                 const nextCode = generateNextCode(parentAccount);
-                setFormData({ 
-                    id: '', 
-                    code: nextCode, 
-                    name: '', 
-                    type: parentAccount.type, 
-                    parentId: parentAccount.id 
-                });
+                setFormData({ id: '', code: nextCode, name: '', type: parentAccount.type, parentId: parentAccount.id });
                 setIsEditing(false);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
 
-                // حذف الحساب من السحابة
                 const handleDeleteClick = async (id) => {
                 if (window.confirm('هل أنت متأكد من حذف هذا الحساب؟')) {
                     const isUsed = journalEntries.some(entry => entry.lines.some(line => line.accountId === id));
-                    if (isUsed) {
-                    alert('لا يمكن حذف حساب تم استخدامه في قيود يومية.');
-                    return;
-                    }
+                    if (isUsed) { alert('لا يمكن حذف حساب تم استخدامه في قيود يومية.'); return; }
                     const hasChildren = accounts.some(a => a.parentId === id);
-                    if (hasChildren) {
-                    alert('لا يمكن حذف حساب رئيسي يحتوي على حسابات فرعية.');
-                    return;
-                    }
-                    try {
-                        await window.fs.deleteDoc(window.fs.doc(window.db, "accounts", id));
-                    } catch(e) {
-                        console.error("خطأ في الحذف السحابي", e);
-                    }
+                    if (hasChildren) { alert('لا يمكن حذف حساب رئيسي يحتوي على حسابات فرعية.'); return; }
+                    try { await window.fs.deleteDoc(window.fs.doc(window.db, "accounts", id)); } catch(e) {}
                 }
                 };
 
@@ -343,53 +374,30 @@
                 return (
                 <div className="space-y-6 animate-fade-in printable-content">
                     <div className="flex justify-between items-center no-print">
-                    <h2 className="text-2xl font-bold text-slate-800">دليل الحسابات (شجرة الحسابات)</h2>
+                    <h2 className="text-2xl font-bold text-slate-800">دليل الحسابات</h2>
                     </div>
 
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 no-print">
-                    <h3 className="text-sm font-bold text-slate-700 mb-3">
-                        {isEditing ? 'تعديل بيانات الحساب' : 'إضافة حساب جديد'}
-                    </h3>
+                    <h3 className="text-sm font-bold text-slate-700 mb-3">{isEditing ? 'تعديل بيانات الحساب' : 'إضافة حساب جديد'}</h3>
                     <div className="flex flex-wrap gap-2 items-end">
                         <div className="w-32">
                         <label className="text-xs text-slate-500 block mb-1">الكود (تلقائي)</label>
-                        <input 
-                            className="border p-2 rounded text-sm w-full bg-slate-100 text-slate-500 cursor-not-allowed"
-                            value={formData.code}
-                            readOnly
-                        />
+                        <input className="border p-2 rounded text-sm w-full bg-slate-100 text-slate-500 cursor-not-allowed" value={formData.code} readOnly />
                         </div>
                         <div className="w-48">
                         <label className="text-xs text-slate-500 block mb-1">الحساب الرئيسي (الأب)</label>
-                        <select 
-                            className="border p-2 rounded text-sm w-full"
-                            value={formData.parentId || ''}
-                            onChange={handleParentChange}
-                            disabled={isEditing}
-                        >
+                        <select className="border p-2 rounded text-sm w-full" value={formData.parentId || ''} onChange={handleParentChange} disabled={isEditing}>
                             <option value="">-- حساب رئيسي (مستوى 1) --</option>
-                            {potentialParents.map(p => (
-                            <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
-                            ))}
+                            {potentialParents.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
                         </select>
                         </div>
                         <div className="flex-1 min-w-[200px]">
                         <label className="text-xs text-slate-500 block mb-1">اسم الحساب</label>
-                        <input 
-                            className="border p-2 rounded text-sm w-full"
-                            value={formData.name}
-                            onChange={e => setFormData({...formData, name: e.target.value})}
-                            placeholder="أدخل اسم الحساب"
-                        />
+                        <input className="border p-2 rounded text-sm w-full" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="أدخل اسم الحساب" />
                         </div>
                         <div className="w-32">
                         <label className="text-xs text-slate-500 block mb-1">النوع</label>
-                        <select 
-                            className="border p-2 rounded text-sm w-full"
-                            value={formData.type}
-                            onChange={e => setFormData({...formData, type: e.target.value})}
-                            disabled={!!formData.parentId}
-                        >
+                        <select className="border p-2 rounded text-sm w-full" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} disabled={!!formData.parentId}>
                             <option value="asset">أصول</option>
                             <option value="liability">خصوم</option>
                             <option value="equity">حقوق ملكية</option>
@@ -399,17 +407,11 @@
                         </div>
                         
                         <div className="flex gap-2">
-                            <button 
-                            onClick={handleSubmit} 
-                            className={`px-4 py-2 rounded text-white text-sm flex items-center gap-1 ${isEditing ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-                            >
-                            {isEditing ? <Save size={16}/> : <Plus size={16}/>}
-                            {isEditing ? 'حفظ' : 'إضافة'}
+                            <button onClick={handleSubmit} className={`px-4 py-2 rounded text-white text-sm flex items-center gap-1 ${isEditing ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                            {isEditing ? <Save size={16}/> : <Plus size={16}/>} {isEditing ? 'حفظ' : 'إضافة'}
                             </button>
                             {(isEditing || formData.parentId) && (
-                            <button onClick={handleCancel} className="px-3 py-2 rounded bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm">
-                                إلغاء
-                            </button>
+                            <button onClick={handleCancel} className="px-3 py-2 rounded bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm">إلغاء</button>
                             )}
                         </div>
                     </div>
@@ -418,14 +420,7 @@
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <table className="w-full text-right">
                         <thead className="bg-slate-50 text-slate-600 text-sm">
-                        <tr>
-                            <th className="px-6 py-3">الكود</th>
-                            <th className="px-6 py-3">اسم الحساب</th>
-                            <th className="px-6 py-3">النوع</th>
-                            <th className="px-6 py-3">المستوى</th>
-                            <th className="px-6 py-3">الرصيد الحالي</th>
-                            <th className="px-6 py-3 text-center no-print">إجراءات</th>
-                        </tr>
+                        <tr><th className="px-6 py-3">الكود</th><th className="px-6 py-3">اسم الحساب</th><th className="px-6 py-3">النوع</th><th className="px-6 py-3">المستوى</th><th className="px-6 py-3">الرصيد الحالي</th><th className="px-6 py-3 text-center no-print">إجراءات</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                         {[...accounts].sort((a,b) => a.code.localeCompare(b.code)).map((acc) => (
@@ -433,49 +428,20 @@
                             <td className="px-6 py-3 font-mono text-slate-500">{acc.code}</td>
                             <td className="px-6 py-3 font-medium text-slate-800">
                                 <div style={{ paddingRight: `${(acc.level - 1) * 24}px` }} className="flex items-center gap-2">
-                                {acc.level > 1 && <span className="text-slate-300">↳</span>}
-                                {acc.name}
+                                {acc.level > 1 && <span className="text-slate-300">↳</span>} {acc.name}
                                 </div>
                             </td>
                             <td className="px-6 py-3 text-sm">
-                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                acc.type === 'asset' ? 'bg-emerald-100 text-emerald-700' :
-                                acc.type === 'liability' ? 'bg-red-100 text-red-700' :
-                                acc.type === 'equity' ? 'bg-purple-100 text-purple-700' :
-                                'bg-blue-100 text-blue-700'
-                                }`}>
-                                {acc.type === 'asset' ? 'أصول' : 
-                                acc.type === 'liability' ? 'خصوم' : 
-                                acc.type === 'equity' ? 'ملكية' : 
-                                acc.type === 'revenue' ? 'إيراد' : 'مصروف'}
+                                <span className={`px-2 py-1 rounded-full text-xs ${acc.type === 'asset' ? 'bg-emerald-100 text-emerald-700' : acc.type === 'liability' ? 'bg-red-100 text-red-700' : acc.type === 'equity' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {acc.type === 'asset' ? 'أصول' : acc.type === 'liability' ? 'خصوم' : acc.type === 'equity' ? 'ملكية' : acc.type === 'revenue' ? 'إيراد' : 'مصروف'}
                                 </span>
                             </td>
                             <td className="px-6 py-3 text-slate-500">{acc.level}</td>
                             <td className="px-6 py-3 font-bold">{getAccountBalance(acc.id).toLocaleString()}</td>
                             <td className="px-6 py-3 flex justify-center gap-2 no-print">
-                                {acc.level < 3 && (
-                                <button 
-                                    onClick={() => handleAddSubAccount(acc)}
-                                    className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors" 
-                                    title="إضافة حساب فرعي"
-                                >
-                                    <Plus size={16} />
-                                </button>
-                                )}
-                                <button 
-                                onClick={() => handleEditClick(acc)}
-                                className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 transition-colors" 
-                                title="تعديل"
-                                >
-                                <Edit size={16} />
-                                </button>
-                                <button 
-                                onClick={() => handleDeleteClick(acc.id)}
-                                className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded border border-red-200 transition-colors" 
-                                title="حذف"
-                                >
-                                <Trash2 size={16} />
-                                </button>
+                                {acc.level < 3 && (<button onClick={() => handleAddSubAccount(acc)} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors" title="إضافة حساب فرعي"><Plus size={16} /></button>)}
+                                <button onClick={() => handleEditClick(acc)} className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 transition-colors" title="تعديل"><Edit size={16} /></button>
+                                <button onClick={() => handleDeleteClick(acc.id)} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded border border-red-200 transition-colors" title="حذف"><Trash2 size={16} /></button>
                             </td>
                             </tr>
                         ))}
@@ -492,102 +458,76 @@
                 const [newEntry, setNewEntry] = useState({
                 date: new Date().toISOString().split('T')[0],
                 description: '',
-                lines: [
-                    { accountId: '', debit: 0, credit: 0, note: '' },
-                    { accountId: '', debit: 0, credit: 0, note: '' }
-                ]
+                lines: [{ accountId: '', debit: 0, credit: 0, note: '' }, { accountId: '', debit: 0, credit: 0, note: '' }]
                 });
 
                 const totalDebit = newEntry.lines.reduce((sum, line) => sum + Number(line.debit), 0);
                 const totalCredit = newEntry.lines.reduce((sum, line) => sum + Number(line.credit), 0);
                 const isBalanced = totalDebit === totalCredit && totalDebit > 0;
 
-                const handleAddLine = () => {
-                setNewEntry({...newEntry, lines: [...newEntry.lines, { accountId: '', debit: 0, credit: 0, note: '' }]});
-                };
-
+                const handleAddLine = () => setNewEntry({...newEntry, lines: [...newEntry.lines, { accountId: '', debit: 0, credit: 0, note: '' }]});
+                
                 const handleLineChange = (index, field, value) => {
-                const updatedLines = [...newEntry.lines];
-                updatedLines[index][field] = value;
-                if (field === 'debit' && value > 0) updatedLines[index].credit = 0;
-                if (field === 'credit' && value > 0) updatedLines[index].debit = 0;
-                setNewEntry({...newEntry, lines: updatedLines});
+                    const updatedLines = [...newEntry.lines];
+                    updatedLines[index][field] = value;
+                    if (field === 'debit' && value > 0) updatedLines[index].credit = 0;
+                    if (field === 'credit' && value > 0) updatedLines[index].debit = 0;
+                    setNewEntry({...newEntry, lines: updatedLines});
                 };
 
                 const handleRemoveLine = (index) => {
-                    if(newEntry.lines.length > 2) {
-                        setNewEntry({...newEntry, lines: newEntry.lines.filter((_, i) => i !== index)});
-                    }
+                    if(newEntry.lines.length > 2) setNewEntry({...newEntry, lines: newEntry.lines.filter((_, i) => i !== index)});
                 };
 
                 const handleEditEntry = (entry) => {
-                setNewEntry(entry);
-                setEditingId(entry.id);
-                setViewMode('create');
+                    setNewEntry(entry);
+                    setEditingId(entry.id);
+                    setViewMode('create');
                 };
 
-                // حفظ القيد في السحابة
-                const saveEntry = async () => {
-                if (!isBalanced || !newEntry.description) return;
-                
-                const entryData = {
-                    date: newEntry.date,
-                    description: newEntry.description,
-                    lines: newEntry.lines
-                };
-                
-                try {
-                    if (editingId) {
-                        await window.fs.updateDoc(window.fs.doc(window.db, "journalEntries", editingId), entryData);
-                    } else {
-                        // استخدام تاريخ الوقت بالملي ثانية كمعرف مستند لترتيبها لاحقا
-                        const timeId = Date.now().toString();
-                        await window.fs.setDoc(window.fs.doc(window.db, "journalEntries", timeId), entryData);
+                // الدالة الجديدة لحذف القيد
+                const handleDeleteEntry = async (id) => {
+                    if (window.confirm('هل أنت متأكد من مسح وإلغاء هذا القيد نهائياً؟ سيتم تحديث جميع الأرصدة المرتبطة به فوراً.')) {
+                        try {
+                            await window.fs.deleteDoc(window.fs.doc(window.db, "journalEntries", id));
+                        } catch(e) {
+                            alert("حدث خطأ أثناء حذف القيد، يرجى المحاولة مرة أخرى.");
+                        }
                     }
+                };
 
-                    setViewMode('list');
-                    setEditingId(null);
-                    setNewEntry({
-                        date: new Date().toISOString().split('T')[0],
-                        description: '',
-                        lines: [{ accountId: '', debit: 0, credit: 0, note: '' }, { accountId: '', debit: 0, credit: 0, note: '' }]
-                    });
-                } catch(e) {
-                    console.error("خطأ في حفظ القيد", e);
-                    alert("حدث خطأ أثناء حفظ القيد");
-                }
+                const saveEntry = async () => {
+                    if (!isBalanced || !newEntry.description) return;
+                    const entryData = { date: newEntry.date, description: newEntry.description, lines: newEntry.lines, userEmail: user.email };
+                    try {
+                        if (editingId) {
+                            await window.fs.updateDoc(window.fs.doc(window.db, "journalEntries", editingId), entryData);
+                        } else {
+                            const timeId = Date.now().toString();
+                            await window.fs.setDoc(window.fs.doc(window.db, "journalEntries", timeId), entryData);
+                        }
+                        setViewMode('list');
+                        setEditingId(null);
+                        setNewEntry({ date: new Date().toISOString().split('T')[0], description: '', lines: [{ accountId: '', debit: 0, credit: 0, note: '' }, { accountId: '', debit: 0, credit: 0, note: '' }] });
+                    } catch(e) { alert("حدث خطأ أثناء حفظ القيد"); }
                 };
 
                 const handleExportJournalExcel = () => {
-                const rows = [
-                    ["رقم القيد", "التاريخ", "البيان", "اسم الحساب", "ملاحظات", "مدين", "دائن"]
-                ];
-                
-                journalEntries.forEach(entry => {
-                    entry.lines.forEach(line => {
-                    const accName = accounts.find(a => a.id === line.accountId)?.name || line.accountId;
-                    rows.push([
-                        entry.id,
-                        entry.date,
-                        entry.description,
-                        accName,
-                        line.note,
-                        line.debit,
-                        line.credit
-                    ]);
+                    const rows = [["رقم القيد", "التاريخ", "البيان", "اسم الحساب", "ملاحظات", "مدين", "دائن", "المدخل"]];
+                    journalEntries.forEach(entry => {
+                        entry.lines.forEach(line => {
+                            const accName = accounts.find(a => a.id === line.accountId)?.name || line.accountId;
+                            rows.push([entry.id, entry.date, entry.description, accName, line.note, line.debit, line.credit, entry.userEmail || '-']);
+                        });
                     });
-                });
-                
-                exportToCSV("journal_entries", rows);
+                    exportToCSV("journal_entries", rows);
                 };
 
                 if (viewMode === 'create') {
                 return (
-                    <div className="space-y-6">
+                    <div className="space-y-6 animate-fade-in">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => { setViewMode('list'); setEditingId(null); }} className="p-2 hover:bg-slate-100 rounded-full">
-                        <ArrowLeft size={20} />
-                        </button>
+                        <button onClick={() => { setViewMode('list'); setEditingId(null); }} className="p-2 hover:bg-slate-100 rounded-full"><ArrowLeft size={20} /></button>
                         <h2 className="text-2xl font-bold text-slate-800">{editingId ? 'تعديل قيد' : 'قيد يومية جديد'}</h2>
                     </div>
 
@@ -595,22 +535,11 @@
                         <div className="grid grid-cols-2 gap-6 mb-6">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">التاريخ</label>
-                            <input 
-                            type="date" 
-                            value={newEntry.date}
-                            onChange={e => setNewEntry({...newEntry, date: e.target.value})}
-                            className="w-full border p-2 rounded-lg" 
-                            />
+                            <input type="date" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} className="w-full border p-2 rounded-lg" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">الوصف / البيان</label>
-                            <input 
-                            type="text" 
-                            value={newEntry.description}
-                            onChange={e => setNewEntry({...newEntry, description: e.target.value})}
-                            className="w-full border p-2 rounded-lg" 
-                            placeholder="شرح القيد..."
-                            />
+                            <input type="text" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} className="w-full border p-2 rounded-lg" placeholder="شرح القيد..." />
                         </div>
                         </div>
 
@@ -629,70 +558,30 @@
                             {newEntry.lines.map((line, idx) => (
                                 <tr key={idx}>
                                 <td className="p-2">
-                                    <select 
-                                    className="w-full p-2 border rounded"
-                                    value={line.accountId}
-                                    onChange={e => handleLineChange(idx, 'accountId', e.target.value)}
-                                    >
+                                    <select className="w-full p-2 border rounded" value={line.accountId} onChange={e => handleLineChange(idx, 'accountId', e.target.value)}>
                                     <option value="">-- اختر الحساب --</option>
-                                    {accounts.filter(a => a.level === 3).map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                                    ))}
+                                    {accounts.filter(a => a.level === 3).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                     </select>
                                 </td>
-                                <td className="p-2">
-                                    <input 
-                                    type="number" min="0" className="w-full p-2 border rounded bg-slate-50 focus:bg-white transition"
-                                    value={line.debit} 
-                                    onChange={e => handleLineChange(idx, 'debit', e.target.value)}
-                                    />
-                                </td>
-                                <td className="p-2">
-                                    <input 
-                                    type="number" min="0" className="w-full p-2 border rounded bg-slate-50 focus:bg-white transition"
-                                    value={line.credit} 
-                                    onChange={e => handleLineChange(idx, 'credit', e.target.value)}
-                                    />
-                                </td>
-                                <td className="p-2">
-                                    <input 
-                                    type="text" className="w-full p-2 border rounded"
-                                    value={line.note} 
-                                    onChange={e => handleLineChange(idx, 'note', e.target.value)}
-                                    />
-                                </td>
-                                <td className="p-2 text-center">
-                                    <button onClick={() => handleRemoveLine(idx)} className="text-red-400 hover:text-red-600">
-                                    <Trash2 size={16} />
-                                    </button>
-                                </td>
+                                <td className="p-2"><input type="number" min="0" className="w-full p-2 border rounded bg-slate-50 focus:bg-white" value={line.debit} onChange={e => handleLineChange(idx, 'debit', e.target.value)} /></td>
+                                <td className="p-2"><input type="number" min="0" className="w-full p-2 border rounded bg-slate-50 focus:bg-white" value={line.credit} onChange={e => handleLineChange(idx, 'credit', e.target.value)} /></td>
+                                <td className="p-2"><input type="text" className="w-full p-2 border rounded" value={line.note} onChange={e => handleLineChange(idx, 'note', e.target.value)} /></td>
+                                <td className="p-2 text-center"><button onClick={() => handleRemoveLine(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button></td>
                                 </tr>
                             ))}
                             </tbody>
                         </table>
                         </div>
 
-                        <button onClick={handleAddLine} className="text-blue-600 text-sm font-medium hover:underline mb-6 flex items-center gap-1">
-                        <Plus size={16} /> إضافة سطر
-                        </button>
+                        <button onClick={handleAddLine} className="text-blue-600 text-sm font-medium hover:underline mb-6 flex items-center gap-1"><Plus size={16} /> إضافة سطر</button>
 
                         <div className="flex justify-between items-center border-t pt-4">
                         <div className="flex gap-8 text-sm">
-                            <div className={`font-bold ${totalDebit === totalCredit ? 'text-emerald-600' : 'text-red-500'}`}>
-                            إجمالي المدين: {totalDebit.toLocaleString()}
-                            </div>
-                            <div className={`font-bold ${totalDebit === totalCredit ? 'text-emerald-600' : 'text-red-500'}`}>
-                            إجمالي الدائن: {totalCredit.toLocaleString()}
-                            </div>
-                            <div className="text-slate-400">
-                            الفرق: {Math.abs(totalDebit - totalCredit).toLocaleString()}
-                            </div>
+                            <div className={`font-bold ${totalDebit === totalCredit ? 'text-emerald-600' : 'text-red-500'}`}>إجمالي المدين: {totalDebit.toLocaleString()}</div>
+                            <div className={`font-bold ${totalDebit === totalCredit ? 'text-emerald-600' : 'text-red-500'}`}>إجمالي الدائن: {totalCredit.toLocaleString()}</div>
+                            <div className="text-slate-400">الفرق: {Math.abs(totalDebit - totalCredit).toLocaleString()}</div>
                         </div>
-                        <button 
-                            onClick={saveEntry}
-                            disabled={!isBalanced}
-                            className={`px-6 py-2 rounded-lg text-white flex items-center gap-2 ${isBalanced ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}
-                        >
+                        <button onClick={saveEntry} disabled={!isBalanced} className={`px-6 py-2 rounded-lg text-white flex items-center gap-2 ${isBalanced ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}>
                             <Save size={18} /> حفظ القيد
                         </button>
                         </div>
@@ -702,51 +591,40 @@
                 }
 
                 return (
-                <div className="space-y-6 printable-content">
+                <div className="space-y-6 printable-content animate-fade-in">
                     <div className="flex justify-between items-center no-print">
                     <h2 className="text-2xl font-bold text-slate-800">قيود اليومية</h2>
                     <div className="flex gap-2">
                         <button onClick={handleExportJournalExcel} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm border border-emerald-200">
-                            <FileSpreadsheet size={18} />
-                            <span>تصدير Excel</span>
+                            <FileSpreadsheet size={18} /><span>تصدير Excel</span>
                         </button>
                         <button onClick={() => setViewMode('create')} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm">
-                        <Plus size={18} />
-                        <span>قيد جديد</span>
+                        <Plus size={18} /><span>قيد جديد</span>
                         </button>
                     </div>
                     </div>
 
                     {journalEntries.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500">
-                        لا توجد قيود يومية مدخلة حتى الآن.
-                    </div>
+                    <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500">لا توجد قيود يومية مدخلة حتى الآن.</div>
                     ) : (
                     <div className="space-y-4">
                         {journalEntries.map(entry => (
                         <div key={entry.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="bg-slate-50 px-6 py-3 border-b flex justify-between items-center">
                             <div>
-                                <span className="text-sm text-slate-500">{entry.date}</span>
+                                <span className="text-sm font-bold text-slate-700">{entry.date}</span>
+                                {entry.userEmail && <span className="text-xs text-slate-400 mr-4 bg-slate-200 px-2 py-0.5 rounded-full">بواسطة: {entry.userEmail.split('@')[0]}</span>}
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-slate-600 font-medium ml-4">{entry.description}</span>
-                                <button 
-                                    onClick={() => handleEditEntry(entry)}
-                                    className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors no-print"
-                                    title="تعديل القيد"
-                                >
-                                    <Edit size={16} />
-                                </button>
+                                <button onClick={() => handleEditEntry(entry)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors no-print" title="تعديل القيد"><Edit size={16} /></button>
+                                {/* زر الحذف الجديد */}
+                                <button onClick={() => handleDeleteEntry(entry.id)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md transition-colors no-print" title="إلغاء وحذف القيد"><Trash2 size={16} /></button>
                             </div>
                             </div>
                             <table className="w-full text-right text-sm">
                             <thead className="text-slate-400 font-normal">
-                                <tr>
-                                <th className="px-6 py-2 w-1/2">الحساب</th>
-                                <th className="px-6 py-2">مدين</th>
-                                <th className="px-6 py-2">دائن</th>
-                                </tr>
+                                <tr><th className="px-6 py-2 w-1/2">الحساب</th><th className="px-6 py-2">مدين</th><th className="px-6 py-2">دائن</th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {entry.lines.map((line, idx) => {
@@ -770,7 +648,6 @@
             };
 
             const GeneralLedgerView = () => {
-                // دالة لحساب حركات حساب واحد
                 const getAccountEntries = (accountId) => {
                 const entries = [];
                 let runningBalance = 0;
@@ -781,46 +658,28 @@
                 journalEntries.forEach(entry => {
                     entry.lines.forEach(line => {
                     if (line.accountId === accountId) {
-                        if(isDebitNature) {
-                            runningBalance += (Number(line.debit) - Number(line.credit));
-                        } else {
-                            runningBalance += (Number(line.credit) - Number(line.debit));
-                        }
-                        entries.push({
-                        date: entry.date,
-                        desc: entry.description,
-                        note: line.note,
-                        debit: line.debit,
-                        credit: line.credit,
-                        balance: runningBalance
-                        });
+                        if(isDebitNature) { runningBalance += (Number(line.debit) - Number(line.credit)); } 
+                        else { runningBalance += (Number(line.credit) - Number(line.debit)); }
+                        entries.push({ date: entry.date, desc: entry.description, note: line.note, debit: line.debit, credit: line.credit, balance: runningBalance });
                     }
                     });
                 });
                 return entries;
                 };
 
-                // جلب جميع الحسابات التي لها حركة
                 const activeAccounts = useMemo(() => {
-                    return accounts
-                        .filter(a => a.level === 3)
-                        .map(acc => ({ ...acc, movements: getAccountEntries(acc.id) }))
-                        .filter(acc => acc.movements.length > 0);
+                    return accounts.filter(a => a.level === 3).map(acc => ({ ...acc, movements: getAccountEntries(acc.id) })).filter(acc => acc.movements.length > 0);
                 }, [accounts, journalEntries]);
 
                 return (
-                <div className="space-y-8 printable-content">
+                <div className="space-y-8 printable-content animate-fade-in">
                     <div className="flex justify-between items-center no-print">
-                        <h2 className="text-2xl font-bold text-slate-800">دفتر الأستاذ العام (جميع الحسابات)</h2>
-                        <button onClick={handlePrint} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 border border-slate-200">
-                            <Printer size={18} /> طباعة الكل
-                        </button>
+                        <h2 className="text-2xl font-bold text-slate-800">دفتر الأستاذ العام</h2>
+                        <button onClick={handlePrint} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 border border-slate-200"><Printer size={18} /> طباعة</button>
                     </div>
                     
                     {activeAccounts.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500">
-                        لا توجد حركات مسجلة لعرضها في دفتر الأستاذ.
-                    </div>
+                    <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500">لا توجد حركات مسجلة لعرضها في دفتر الأستاذ.</div>
                     ) : (
                         activeAccounts.map(acc => (
                             <div key={acc.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden break-inside-avoid">
@@ -830,21 +689,13 @@
                                 </div>
                                 <table className="w-full text-right">
                                     <thead className="bg-white text-slate-600 text-sm border-b">
-                                        <tr>
-                                            <th className="px-6 py-2">التاريخ</th>
-                                            <th className="px-6 py-2">البيان</th>
-                                            <th className="px-6 py-2">مدين</th>
-                                            <th className="px-6 py-2">دائن</th>
-                                            <th className="px-6 py-2">الرصيد</th>
-                                        </tr>
+                                        <tr><th className="px-6 py-2">التاريخ</th><th className="px-6 py-2">البيان</th><th className="px-6 py-2">مدين</th><th className="px-6 py-2">دائن</th><th className="px-6 py-2">الرصيد</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {acc.movements.map((row, idx) => (
                                             <tr key={idx} className="hover:bg-slate-50 text-sm">
                                                 <td className="px-6 py-2 text-slate-600">{row.date}</td>
-                                                <td className="px-6 py-2 font-medium text-slate-800">
-                                                    {row.desc} {row.note && <span className="text-xs text-slate-400 block">{row.note}</span>}
-                                                </td>
+                                                <td className="px-6 py-2 font-medium text-slate-800">{row.desc} {row.note && <span className="text-xs text-slate-400 block">{row.note}</span>}</td>
                                                 <td className="px-6 py-2 text-emerald-600">{row.debit > 0 ? Number(row.debit).toLocaleString() : '-'}</td>
                                                 <td className="px-6 py-2 text-red-600">{row.credit > 0 ? Number(row.credit).toLocaleString() : '-'}</td>
                                                 <td className="px-6 py-2 font-bold">{row.balance.toLocaleString()}</td>
@@ -862,11 +713,7 @@
             const FinancialStatementsView = () => {
                 const [reportType, setReportType] = useState('income');
 
-                const calculateTotalByType = (type) => {
-                return accounts
-                    .filter(a => a.type === type && a.level === 3)
-                    .reduce((sum, acc) => sum + getAccountBalance(acc.id), 0);
-                };
+                const calculateTotalByType = (type) => accounts.filter(a => a.type === type && a.level === 3).reduce((sum, acc) => sum + getAccountBalance(acc.id), 0);
 
                 const revenues = calculateTotalByType('revenue');
                 const expenses = calculateTotalByType('expense');
@@ -875,106 +722,33 @@
                 const liabilities = calculateTotalByType('liability');
                 const equity = calculateTotalByType('equity') + netIncome;
 
-                const trialBalanceData = accounts
-                .filter(a => a.level === 3)
-                .map(acc => {
+                const trialBalanceData = accounts.filter(a => a.level === 3).map(acc => {
                     const balance = getAccountBalance(acc.id);
-                    const { totalDebit, totalCredit } = getAccountTotals(acc.id);
                     const isDebit = ['asset', 'expense'].includes(acc.type);
-                    const debitBalance = isDebit ? balance : 0;
-                    const creditBalance = !isDebit ? balance : 0;
-                    
-                    return { 
-                    ...acc, 
-                    balance, 
-                    debitBalance, 
-                    creditBalance 
-                    };
-                })
-                .filter(acc => acc.balance !== 0); 
+                    return { ...acc, balance, debitBalance: isDebit ? balance : 0, creditBalance: !isDebit ? balance : 0 };
+                }).filter(acc => acc.balance !== 0); 
 
                 const totalTrialDebit = trialBalanceData.reduce((sum, acc) => sum + (acc.debitBalance > 0 ? acc.debitBalance : 0), 0);
                 const totalTrialCredit = trialBalanceData.reduce((sum, acc) => sum + (acc.creditBalance > 0 ? acc.creditBalance : 0), 0);
 
-                const handleExportExcel = () => {
-                    let rows = [];
-                    let filename = "";
-
-                    if (reportType === 'trial') {
-                        filename = "Trial_Balance";
-                        rows.push(["كود الحساب", "اسم الحساب", "أرصدة مدينة", "أرصدة دائنة"]);
-                        trialBalanceData.forEach(acc => {
-                            rows.push([acc.code, acc.name, acc.debitBalance, acc.creditBalance]);
-                        });
-                        rows.push(["الإجمالي", "", totalTrialDebit, totalTrialCredit]);
-                    } else if (reportType === 'income') {
-                        filename = "Income_Statement";
-                        rows.push(["قائمة الدخل", ""]);
-                        rows.push(["", "جزئي", "كلي"]);
-                        rows.push(["الإيرادات", "", ""]);
-                        accounts.filter(a => a.type === 'revenue' && a.level === 3).forEach(acc => {
-                            const bal = getAccountBalance(acc.id);
-                            if(bal > 0) rows.push([acc.name, bal, ""]);
-                        });
-                        rows.push(["إجمالي الإيرادات", "", revenues]);
-                        rows.push(["المصروفات", "", ""]);
-                        accounts.filter(a => a.type === 'expense' && a.level === 3).forEach(acc => {
-                            const bal = getAccountBalance(acc.id);
-                            if(bal > 0) rows.push([acc.name, bal, ""]);
-                        });
-                        rows.push(["إجمالي المصروفات", "", expenses]);
-                        rows.push(["صافي الربح/الخسارة", "", netIncome]);
-                    } else {
-                        filename = "Balance_Sheet";
-                        rows.push(["الميزانية العمومية", ""]);
-                        rows.push(["الأصول", assets]);
-                        rows.push(["الخصوم", liabilities]);
-                        rows.push(["حقوق الملكية", equity]);
-                    }
-
-                    exportToCSV(filename, rows);
-                };
-
                 return (
-                <div className="space-y-6 printable-content">
+                <div className="space-y-6 printable-content animate-fade-in">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 no-print">
                     <h2 className="text-2xl font-bold text-slate-800">القوائم المالية</h2>
                     <div className="flex gap-2">
-                        <button onClick={handleExportExcel} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1 rounded text-sm flex items-center gap-1 border border-emerald-200">
-                            <FileSpreadsheet size={16} /> تصدير Excel
-                        </button>
-                        <button onClick={handlePrint} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded text-sm flex items-center gap-1 border border-slate-200">
-                            <Printer size={16} /> طباعة / PDF
-                        </button>
+                        <button onClick={handlePrint} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded text-sm flex items-center gap-1 border border-slate-200"><Printer size={16} /> طباعة / PDF</button>
                     </div>
                     <div className="flex bg-white rounded-lg border p-1 shadow-sm no-print">
-                        <button 
-                        onClick={() => setReportType('income')}
-                        className={`px-4 py-2 rounded text-sm ${reportType === 'income' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}
-                        >
-                        قائمة الدخل
-                        </button>
-                        <button 
-                        onClick={() => setReportType('balance')}
-                        className={`px-4 py-2 rounded text-sm ${reportType === 'balance' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}
-                        >
-                        المركز المالي
-                        </button>
-                        <button 
-                        onClick={() => setReportType('trial')}
-                        className={`px-4 py-2 rounded text-sm ${reportType === 'trial' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}
-                        >
-                        ميزان المراجعة
-                        </button>
+                        <button onClick={() => setReportType('income')} className={`px-4 py-2 rounded text-sm ${reportType === 'income' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>قائمة الدخل</button>
+                        <button onClick={() => setReportType('balance')} className={`px-4 py-2 rounded text-sm ${reportType === 'balance' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>المركز المالي</button>
+                        <button onClick={() => setReportType('trial')} className={`px-4 py-2 rounded text-sm ${reportType === 'trial' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>ميزان المراجعة</button>
                     </div>
                     </div>
 
                     <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
                     <div className="text-center mb-8 border-b pb-4">
-                        <h1 className="text-xl font-bold text-slate-800">أكرم فاضل</h1>
-                        <h2 className="text-lg text-slate-600 mt-2">
-                        {reportType === 'income' ? 'قائمة الدخل' : reportType === 'balance' ? 'الميزانية العمومية' : 'ميزان المراجعة بالأرصدة'}
-                        </h2>
+                        <h1 className="text-xl font-bold text-slate-800">المحاسب القانوني المستقبلي زياد العتيبي</h1>
+                        <h2 className="text-lg text-slate-600 mt-2">{reportType === 'income' ? 'قائمة الدخل' : reportType === 'balance' ? 'الميزانية العمومية' : 'ميزان المراجعة بالأرصدة'}</h2>
                         <p className="text-sm text-slate-400 mt-1">كما في {new Date().toLocaleDateString('ar-SA')}</p>
                     </div>
 
@@ -982,24 +756,15 @@
                         <div className="overflow-hidden">
                         <table className="w-full text-right border-collapse">
                             <thead className="bg-slate-50 text-slate-700 text-sm border-b border-t border-slate-200">
-                            <tr>
-                                <th className="px-4 py-2 border-l">كود الحساب</th>
-                                <th className="px-4 py-2 border-l">اسم الحساب</th>
-                                <th className="px-4 py-2 border-l text-center">أرصدة مدينة</th>
-                                <th className="px-4 py-2 text-center">أرصدة دائنة</th>
-                            </tr>
+                            <tr><th className="px-4 py-2 border-l">كود الحساب</th><th className="px-4 py-2 border-l">اسم الحساب</th><th className="px-4 py-2 border-l text-center">أرصدة مدينة</th><th className="px-4 py-2 text-center">أرصدة دائنة</th></tr>
                             </thead>
                             <tbody className="text-sm text-slate-600 divide-y divide-slate-100">
                             {trialBalanceData.map(acc => (
                                 <tr key={acc.id} className="hover:bg-slate-50">
                                 <td className="px-4 py-2 border-l font-mono">{acc.code}</td>
                                 <td className="px-4 py-2 border-l">{acc.name}</td>
-                                <td className="px-4 py-2 border-l text-center">
-                                    {acc.debitBalance > 0 ? acc.debitBalance.toLocaleString() : '-'}
-                                </td>
-                                <td className="px-4 py-2 text-center">
-                                    {acc.creditBalance > 0 ? acc.creditBalance.toLocaleString() : '-'}
-                                </td>
+                                <td className="px-4 py-2 border-l text-center">{acc.debitBalance > 0 ? acc.debitBalance.toLocaleString() : '-'}</td>
+                                <td className="px-4 py-2 text-center">{acc.creditBalance > 0 ? acc.creditBalance.toLocaleString() : '-'}</td>
                                 </tr>
                             ))}
                             </tbody>
@@ -1011,11 +776,6 @@
                             </tr>
                             </tfoot>
                         </table>
-                        {totalTrialDebit !== totalTrialCredit && (
-                            <div className="mt-4 p-3 bg-red-50 text-red-700 text-center rounded border border-red-200">
-                                تنبيه: ميزان المراجعة غير متطابق! يرجى مراجعة قيود اليومية.
-                            </div>
-                        )}
                         </div>
                     )}
 
@@ -1023,57 +783,26 @@
                         <div>
                         <table className="w-full text-right border-collapse text-sm">
                             <thead className="bg-slate-50 text-slate-700 font-bold border-t border-b border-slate-200">
-                            <tr>
-                                <th className="px-4 py-3 border-l w-1/2">البيان</th>
-                                <th className="px-4 py-3 border-l text-center w-1/4">جزئي</th>
-                                <th className="px-4 py-3 text-center w-1/4">كلي</th>
-                            </tr>
+                            <tr><th className="px-4 py-3 border-l w-1/2">البيان</th><th className="px-4 py-3 border-l text-center w-1/4">جزئي</th><th className="px-4 py-3 text-center w-1/4">كلي</th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700">
-                            {/* الإيرادات */}
                             <tr className="bg-slate-50 font-bold"><td colSpan="3" className="px-4 py-2">الإيرادات</td></tr>
                             {accounts.filter(a => a.type === 'revenue' && a.level === 3).map(acc => {
                                 const bal = getAccountBalance(acc.id);
                                 if (bal === 0) return null;
-                                return (
-                                <tr key={acc.id}>
-                                    <td className="px-8 py-2 border-l">{acc.name}</td>
-                                    <td className="px-4 py-2 border-l text-center">{bal.toLocaleString()}</td>
-                                    <td className="px-4 py-2 text-center"></td>
-                                </tr>
-                                );
+                                return (<tr key={acc.id}><td className="px-8 py-2 border-l">{acc.name}</td><td className="px-4 py-2 border-l text-center">{bal.toLocaleString()}</td><td className="px-4 py-2 text-center"></td></tr>);
                             })}
-                            <tr className="font-bold bg-emerald-50 text-emerald-800 border-t border-b">
-                                <td className="px-4 py-2 border-l">إجمالي الإيرادات</td>
-                                <td className="px-4 py-2 border-l text-center"></td>
-                                <td className="px-4 py-2 text-center">{revenues.toLocaleString()}</td>
-                            </tr>
+                            <tr className="font-bold bg-emerald-50 text-emerald-800 border-t border-b"><td className="px-4 py-2 border-l">إجمالي الإيرادات</td><td className="px-4 py-2 border-l text-center"></td><td className="px-4 py-2 text-center">{revenues.toLocaleString()}</td></tr>
 
-                            {/* المصروفات */}
                             <tr className="bg-slate-50 font-bold"><td colSpan="3" className="px-4 py-2 mt-4">المصروفات</td></tr>
                             {accounts.filter(a => a.type === 'expense' && a.level === 3).map(acc => {
                                 const bal = getAccountBalance(acc.id);
                                 if (bal === 0) return null;
-                                return (
-                                <tr key={acc.id}>
-                                    <td className="px-8 py-2 border-l">{acc.name}</td>
-                                    <td className="px-4 py-2 border-l text-center">({bal.toLocaleString()})</td>
-                                    <td className="px-4 py-2 text-center"></td>
-                                </tr>
-                                );
+                                return (<tr key={acc.id}><td className="px-8 py-2 border-l">{acc.name}</td><td className="px-4 py-2 border-l text-center">({bal.toLocaleString()})</td><td className="px-4 py-2 text-center"></td></tr>);
                             })}
-                            <tr className="font-bold bg-red-50 text-red-800 border-t border-b">
-                                <td className="px-4 py-2 border-l">إجمالي المصروفات</td>
-                                <td className="px-4 py-2 border-l text-center"></td>
-                                <td className="px-4 py-2 text-center">({expenses.toLocaleString()})</td>
-                            </tr>
+                            <tr className="font-bold bg-red-50 text-red-800 border-t border-b"><td className="px-4 py-2 border-l">إجمالي المصروفات</td><td className="px-4 py-2 border-l text-center"></td><td className="px-4 py-2 text-center">({expenses.toLocaleString()})</td></tr>
 
-                            {/* صافي الربح */}
-                            <tr className="bg-slate-800 text-white font-bold text-lg">
-                                <td className="px-4 py-3 border-l">صافي الربح / (الخسارة)</td>
-                                <td className="px-4 py-3 border-l"></td>
-                                <td className="px-4 py-3 text-center">{netIncome.toLocaleString()}</td>
-                            </tr>
+                            <tr className="bg-slate-800 text-white font-bold text-lg"><td className="px-4 py-3 border-l">صافي الربح / (الخسارة)</td><td className="px-4 py-3 border-l"></td><td className="px-4 py-3 text-center">{netIncome.toLocaleString()}</td></tr>
                             </tbody>
                         </table>
                         </div>
@@ -1084,53 +813,26 @@
                         <div>
                             <h3 className="font-bold text-emerald-700 border-b border-emerald-100 pb-2 mb-2">الأصول</h3>
                             {accounts.filter(a => a.type === 'asset' && getAccountBalance(a.id) !== 0).map(acc => (
-                            <div key={acc.id} className="flex justify-between text-sm text-slate-600 mb-1">
-                                <span>{acc.name}</span>
-                                <span>{getAccountBalance(acc.id).toLocaleString()}</span>
-                            </div>
+                            <div key={acc.id} className="flex justify-between text-sm text-slate-600 mb-1"><span>{acc.name}</span><span>{getAccountBalance(acc.id).toLocaleString()}</span></div>
                             ))}
-                            <div className="flex justify-between font-bold text-slate-800 mt-2 pt-2 border-t">
-                            <span>إجمالي الأصول</span>
-                            <span>{assets.toLocaleString()}</span>
-                            </div>
+                            <div className="flex justify-between font-bold text-slate-800 mt-2 pt-2 border-t"><span>إجمالي الأصول</span><span>{assets.toLocaleString()}</span></div>
                         </div>
-
                         <div>
                             <h3 className="font-bold text-red-700 border-b border-red-100 pb-2 mb-2">الخصوم</h3>
                             {accounts.filter(a => a.type === 'liability' && getAccountBalance(a.id) !== 0).map(acc => (
-                            <div key={acc.id} className="flex justify-between text-sm text-slate-600 mb-1">
-                                <span>{acc.name}</span>
-                                <span>{getAccountBalance(acc.id).toLocaleString()}</span>
-                            </div>
+                            <div key={acc.id} className="flex justify-between text-sm text-slate-600 mb-1"><span>{acc.name}</span><span>{getAccountBalance(acc.id).toLocaleString()}</span></div>
                             ))}
-                            <div className="flex justify-between font-bold text-slate-800 mt-2 pt-2 border-t">
-                            <span>إجمالي الخصوم</span>
-                            <span>{liabilities.toLocaleString()}</span>
-                            </div>
+                            <div className="flex justify-between font-bold text-slate-800 mt-2 pt-2 border-t"><span>إجمالي الخصوم</span><span>{liabilities.toLocaleString()}</span></div>
                         </div>
-
                         <div>
                             <h3 className="font-bold text-blue-700 border-b border-blue-100 pb-2 mb-2">حقوق الملكية</h3>
                             {accounts.filter(a => a.type === 'equity' && getAccountBalance(a.id) !== 0).map(acc => (
-                            <div key={acc.id} className="flex justify-between text-sm text-slate-600 mb-1">
-                                <span>{acc.name}</span>
-                                <span>{getAccountBalance(acc.id).toLocaleString()}</span>
-                            </div>
+                            <div key={acc.id} className="flex justify-between text-sm text-slate-600 mb-1"><span>{acc.name}</span><span>{getAccountBalance(acc.id).toLocaleString()}</span></div>
                             ))}
-                            <div className="flex justify-between text-sm text-slate-600 mb-1">
-                                <span>أرباح العام (مرحلة من قائمة الدخل)</span>
-                                <span>{netIncome.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between font-bold text-slate-800 mt-2 pt-2 border-t">
-                            <span>إجمالي حقوق الملكية</span>
-                            <span>{equity.toLocaleString()}</span>
-                            </div>
+                            <div className="flex justify-between text-sm text-slate-600 mb-1"><span>أرباح العام</span><span>{netIncome.toLocaleString()}</span></div>
+                            <div className="flex justify-between font-bold text-slate-800 mt-2 pt-2 border-t"><span>إجمالي حقوق الملكية</span><span>{equity.toLocaleString()}</span></div>
                         </div>
-
-                        <div className="flex justify-between font-bold text-white bg-slate-800 p-4 rounded mt-4">
-                            <span>إجمالي الخصوم وحقوق الملكية</span>
-                            <span>{(liabilities + equity).toLocaleString()}</span>
-                        </div>
+                        <div className="flex justify-between font-bold text-white bg-slate-800 p-4 rounded mt-4"><span>إجمالي الخصوم وحقوق الملكية</span><span>{(liabilities + equity).toLocaleString()}</span></div>
                         </div>
                     )}
                     </div>
@@ -1144,35 +846,16 @@
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <p className="text-slate-500 text-sm mb-1">إجمالي الأصول</p>
-                    <h3 className="text-3xl font-bold text-slate-800">
-                        {getAccountBalance('1').toLocaleString()}
-                    </h3>
-                    <div className="mt-4 h-1 bg-emerald-100 rounded overflow-hidden">
-                        <div className="h-full bg-emerald-500 w-full"></div>
-                    </div>
+                    <h3 className="text-3xl font-bold text-slate-800">{accounts.filter(a=>a.type==='asset').reduce((sum,acc)=>sum+getAccountBalance(acc.id),0).toLocaleString()}</h3>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <p className="text-slate-500 text-sm mb-1">إجمالي الالتزامات</p>
-                    <h3 className="text-3xl font-bold text-slate-800">
-                        {getAccountBalance('2').toLocaleString()}
-                    </h3>
-                    <div className="mt-4 h-1 bg-red-100 rounded overflow-hidden">
-                        <div className="h-full bg-red-500 w-2/3"></div>
-                    </div>
+                    <h3 className="text-3xl font-bold text-slate-800">{accounts.filter(a=>a.type==='liability').reduce((sum,acc)=>sum+getAccountBalance(acc.id),0).toLocaleString()}</h3>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <p className="text-slate-500 text-sm mb-1">صافي الدخل (تقريبي)</p>
-                    <h3 className="text-3xl font-bold text-blue-600">
-                        {(getAccountBalance('4') - getAccountBalance('5')).toLocaleString()}
-                    </h3>
-                    <div className="mt-4 h-1 bg-blue-100 rounded overflow-hidden">
-                        <div className="h-full bg-blue-500 w-1/2"></div>
+                    <h3 className="text-3xl font-bold text-blue-600">{(accounts.filter(a=>a.type==='revenue').reduce((sum,acc)=>sum+getAccountBalance(acc.id),0) - accounts.filter(a=>a.type==='expense').reduce((sum,acc)=>sum+getAccountBalance(acc.id),0)).toLocaleString()}</h3>
                     </div>
-                    </div>
-                </div>
-                
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800 text-sm no-print">
-                    <strong>تلميح:</strong> لضمان توازن الميزانية، تأكد دائمًا من أن إجمالي المدين يساوي إجمالي الدائن في قيود اليومية.
                 </div>
                 </div>
             );
@@ -1180,25 +863,27 @@
             const SidebarItem = ({ id, label, icon: Icon }) => (
                 <button
                 onClick={() => setActiveTab(id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors duration-200 ${
-                    activeTab === id 
-                    ? 'bg-blue-600 text-white shadow-md' 
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors duration-200 ${activeTab === id ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
                 >
                 <Icon size={20} />
                 <span className={`font-medium ${!isSidebarOpen && 'hidden'}`}>{label}</span>
                 </button>
             );
 
-            // صفحة انتظار لحين تحميل البيانات من السحابة
+            if (authChecking) {
+                return <div className="flex h-screen items-center justify-center bg-slate-50 font-sans text-slate-500">جاري التحقق من حالة الدخول...</div>;
+            }
+
+            if (!user) {
+                return <LoginScreen />;
+            }
+
             if (!isLoaded) {
                 return (
                     <div className="flex h-screen items-center justify-center bg-slate-50 font-sans" dir="rtl">
                         <div className="text-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                            <h2 className="text-xl font-bold text-slate-700">جاري الاتصال بالسحابة...</h2>
-                            <p className="text-slate-500 text-sm mt-2">يرجى الانتظار لحظات</p>
+                            <h2 className="text-xl font-bold text-slate-700">جاري تحميل البيانات...</h2>
                         </div>
                     </div>
                 );
@@ -1206,17 +891,12 @@
 
             return (
                 <div className="flex h-screen bg-slate-50 font-sans" dir="rtl">
-                <aside className={`bg-slate-900 text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+                <aside className={`bg-slate-900 text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} no-print`}>
                     <div className="p-6 border-b border-slate-800 flex items-center justify-between">
                     <div className={`${!isSidebarOpen && 'hidden'}`}>
-                        <div className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 leading-tight">
-                        نظام محاسبي سحابي
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1 font-medium">أكرم فاضل</div>
+                        <div className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 leading-tight">النظام المحاسبي</div>
                     </div>
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-400 hover:text-white">
-                        <Menu size={20} />
-                    </button>
+                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-400 hover:text-white"><Menu size={20} /></button>
                     </div>
                     <nav className="flex-1 py-6 space-y-1">
                     <SidebarItem id="dashboard" label="الرئيسية" icon={Home} />
@@ -1228,7 +908,7 @@
                 </aside>
 
                 <main className="flex-1 overflow-auto flex flex-col">
-                    <header className="bg-white border-b border-slate-200 p-4 px-8 shadow-sm sticky top-0 z-10 flex justify-between">
+                    <header className="bg-white border-b border-slate-200 p-4 px-8 shadow-sm sticky top-0 z-10 flex justify-between items-center no-print">
                     <h1 className="text-xl font-bold text-slate-700">
                         {activeTab === 'dashboard' && 'الرئيسية'}
                         {activeTab === 'coa' && 'دليل الحسابات'}
@@ -1236,11 +916,12 @@
                         {activeTab === 'ledger' && 'دفتر الأستاذ'}
                         {activeTab === 'reports' && 'التقارير المالية'}
                     </h1>
-                    <div className="flex items-center gap-2 text-slate-500 text-sm">
-                        <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            متصل بالسحابة
-                        </span>
+                    <div className="flex items-center gap-4 text-slate-500 text-sm">
+                        <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-1 rounded">متصل</span>
+                        <span className="bg-slate-100 px-3 py-1 rounded font-bold">{user.email.split('@')[0]}</span>
+                        <button onClick={handleLogout} className="flex items-center gap-1 text-red-500 hover:text-red-700 bg-red-50 px-3 py-1 rounded transition-colors" title="تسجيل خروج">
+                            <LogOut size={16} /> خروج
+                        </button>
                     </div>
                     </header>
 
